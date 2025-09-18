@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups"/>
+  <title>CCA Peer Tutoring</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="tutor-view">
+  <nav class="top-bar">
+    <div class="left-group">
+      <select id="role-select">
+        <option value="tutor">Tutor View</option>
+        <option value="student">Student View</option>
+      </select>
+    </div>
+    <div class="right-group">
+      <button id="sign-btn">Sign In</button>
+      <button id="settings-btn" style="display: none;">Settings</button>
+      <span id="current-role">Tutor</span>
+      <img id="profile-pic" src="avatar-placeholder.png" alt="Profile" />
+    </div>
+  </nav>
+
+  <main class="content">
+    <section class="hero tutor-section">
+      <h1>Welcome to CCA Peer Tutoring</h1>
+      <p>Find available tutoring slots below</p>
+      
+      <!-- Add filters for students -->
+      <div class="student-filters">
+        <select id="student-subject-filter">
+          <option value="">All Subjects</option>
+          <option value="english">English</option>
+          <option value="history">History</option>
+          <option value="math">Math</option>
+          <option value="science">Science</option>
+          <option value="other">Other</option>
+          <option value="languages">Languages</option>
+        </select>
+        <div id="student-calendar-filter"></div>
+      </div>
+
+      <!-- Container for available slots -->
+      <div id="available-slots" class="slots-grid"></div>
+    </section>
+
+    <section class="student-section" style="display: none;">
+      <h2>My Availability Slots</h2>
+      <div class="add-slot-form">
+        <h3>Add New Slot</h3>
+        <form id="slot-form">
+          <div class="form-group">
+            <label for="slot-date">Date: <i class="info-icon" title="Select a date between 2 days and 2 weeks from now">ⓘ</i></label>
+            <input type="date" id="slot-date" required>
+            <div id="date-warning" style="color: #ff4444; display: none; font-size: 0.95em; margin-top: 0.3em;"></div>
+          </div>
+          <select id="day-select" required disabled>
+            <option value="">Day will be set automatically</option>
+          </select>
+          <!-- Replace the existing time-select input with this -->
+          <div class="time-range">
+            <div class="time-input">
+              <label for="start-time">Start Time: <i class="info-icon" title="Pick a start time (hour or half-hour only)">ⓘ</i></label>
+              <select id="start-time" required></select>
+            </div>
+            <div class="time-input">
+              <label for="duration">Duration:</label>
+              <select id="duration" required>
+                <option value="30">30 minutes</option>
+                <option value="60">1 hour</option>
+              </select>
+            </div>
+          </div>
+          <select id="location-select" required>
+            <option value="">Select Location</option>
+            <option>Library</option>
+            <option>Cafeteria</option>
+            <option value="school">School Building</option>
+          </select>
+          <div id="building-select-container" style="display: none;">
+            <select id="building-select" required>
+              <option value="">Select Building</option>
+            </select>
+            <select id="room-select" required>
+              <option value="">Select Room</option>
+            </select>
+          </div>
+          <!-- Two-level subject selection -->
+          <select id="subject-category" required>
+            <option value="">Select Subject Category</option>
+            <option value="english">English</option>
+            <option value="history">History</option>
+            <option value="math">Math</option>
+            <option value="science">Science</option>
+            <option value="other">Other</option>
+            <option value="languages">Languages</option>
+          </select>
+
+          <div id="specific-subject-container" style="display: none;">
+            <select id="specific-subject" required>
+              <option value="">Select Specific Course</option>
+            </select>
+          </div>
+
+          <div id="language-level-container" style="display: none;">
+            <label for="language-level">Level:</label>
+            <select id="language-level" required>
+              <option value="">Select Level</option>
+              <option value="1">Level 1</option>
+              <option value="2">Level 2</option>
+              <option value="3">Level 3</option>
+              <option value="4">Level 4</option>
+              <option value="5">Level 5</option>
+              <option value="AP">AP</option>
+            </select>
+          </div>
+          <button type="submit">Add Slot</button>
+        </form>
+      </div>
+      <div id="slots-list"></div>
+    </section>
+  </main>
+
+  <!-- Load Firebase logic -->
+  <script type="module" src="actual.js"></script>
+
+  <div id="profile-setup-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h2>Complete Your Profile</h2>
+      <form id="profile-setup-form">
+        <div class="form-group">
+          <label for="first-name">First Name:</label>
+          <input type="text" id="first-name" required>
+        </div>
+        <div class="form-group">
+          <label for="last-name">Last Name:</label>
+          <input type="text" id="last-name" required>
+        </div>
+        <div class="form-group">
+          <label for="user-grade">Grade:</label>
+          <select id="user-grade" required>
+            <option value="">Select Grade</option>
+            <option value="9">9th Grade</option>
+            <option value="10">10th Grade</option>
+            <option value="11">11th Grade</option>
+            <option value="12">12th Grade</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="profile-photo">Profile Photo (head and shoulders in view):</label>
+          <input type="file" id="profile-photo" accept="image/*" required>
+          <small style="color: #666; display: block; margin-top: 0.3em;">
+            Please upload a clear photo with your head and shoulders visible. Background can be anything. 
+            This photo will be shown to other users after they book a meeting with you.
+          </small>
+        </div>
+        <div class="form-group">
+          <label>Classes I need help in <span class="subtext">(select all that apply)</span>:</label>
+          <div id="help-needed-subjects" class="subject-checkboxes stylish-checkboxes"></div>
+          <div class="never-checkbox-group">
+            <label style="margin-top: 0.5rem;">
+              <input type="checkbox" id="never-student"> I'll never be a student (won't need tutoring)
+            </label>
+            <div class="never-subtext">You can change this at any time in your settings.</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Classes I'm comfortable tutoring <span class="subtext">(select all that apply)</span>:</label>
+          <div id="tutoring-subjects" class="subject-checkboxes stylish-checkboxes"></div>
+          <div class="never-checkbox-group">
+            <label style="margin-top: 0.5rem;">
+              <input type="checkbox" id="never-tutor"> I'll never be a tutor
+            </label>
+            <div class="never-subtext">You can change this at any time in your settings.</div>
+          </div>
+        </div>
+        <button type="submit">Save Profile</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <span id="close-settings-modal" style="float:right;cursor:pointer;font-size:1.5em;">&times;</span>
+      <h2>Profile Settings</h2>
+      <div class="settings-tabs">
+        <button type="button" id="student-settings-tab" class="tab-button active">Student Settings</button>
+        <button type="button" id="tutor-settings-tab" class="tab-button">Tutor Settings</button>
+      </div>
+      
+      <div id="student-settings" class="settings-tab-content">
+        <h3>Classes I need help in <span class="subtext">(select all that apply)</span>:</h3>
+        <div id="student-help-subjects" class="subject-checkboxes stylish-checkboxes"></div>
+        <div class="never-checkbox-group">
+          <label style="margin-top: 0.5rem;">
+            <input type="checkbox" id="settings-never-student"> I'll never be a student (won't need tutoring)
+          </label>
+          <div class="never-subtext">You can change this at any time in your settings.</div>
+        </div>
+        <button type="button" id="save-student-settings">Save Student Settings</button>
+      </div>
+      
+      <div id="tutor-settings" class="settings-tab-content" style="display: none;">
+        <h3>Classes I'm comfortable tutoring <span class="subtext">(select all that apply)</span>:</h3>
+        <div id="tutor-help-subjects" class="subject-checkboxes stylish-checkboxes"></div>
+        <div class="never-checkbox-group">
+          <label style="margin-top: 0.5rem;">
+            <input type="checkbox" id="settings-never-tutor"> I'll never be a tutor
+          </label>
+          <div class="never-subtext">You can change this at any time in your settings.</div>
+        </div>
+        <button type="button" id="save-tutor-settings">Save Tutor Settings</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
