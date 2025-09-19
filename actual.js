@@ -729,14 +729,24 @@ async function loadAvailableSlots() {
         card.className = 'available-slot-card';
         card.dataset.slotId = doc.id;
         card.innerHTML = `
-          <div>
-            <strong>${slotData.tutorName}</strong><br>
-            <span style="font-size:0.95em;">${slotData.subject}</span>
+          <div class="tutor-info">
+            <div class="tutor-name">${slotData.tutorName}</div>
+            <div class="subject">${slotData.subject}</div>
           </div>
-          <p>Date: ${new Date(slotData.date).toLocaleDateString()}</p>
-          <p>Day: ${slotData.day}</p>
-          <p>Time: ${formatTime(slotData.startTime)} - ${formatTime(slotData.endTime)}</p>
-          <p>Location: ${slotData.location}</p>
+          <div class="slot-details">
+            <div class="detail-item">
+              <span class="detail-icon">📅</span>
+              <span>${new Date(slotData.date).toLocaleDateString()} (${slotData.day})</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-icon">🕒</span>
+              <span>${formatTime(slotData.startTime)} - ${formatTime(slotData.endTime)}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-icon">📍</span>
+              <span>${slotData.location}</span>
+            </div>
+          </div>
           <button class="book-slot-btn">Book Slot</button>
         `;
         availableSlots.appendChild(card);
