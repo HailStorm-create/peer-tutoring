@@ -82,10 +82,11 @@ body.student-view {
 }
 
 body {
-  font-family: sans-serif;
-  background: var(--bg);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   color: var(--text);
   transition: background var(--transition), color var(--transition);
+  min-height: 100vh;
 }
 
 /* Top navigation bar */
@@ -136,31 +137,43 @@ body {
 
 /* Main content outline */
 .content {
-  max-width: 640px;
-  margin: 2rem auto;
-  padding: 0 1rem;
+  max-width: 100%;
+  margin: 0;
+  padding: 1rem;
+  min-height: calc(100vh - 80px); /* Account for top bar */
 }
 
 .hero {
   text-align: center;
-  padding: 2rem 1rem;
-  background: #fff;
-  border-radius: var(--radius);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  padding: 3rem 2rem 2rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  border: 1px solid #f0f0f0;
 }
 
 .hero h1 {
   margin-bottom: 0.5rem;
   color: var(--primary);
+  font-size: 2.5rem;
+  font-weight: 700;
+}
+
+.hero p {
+  color: #666;
+  font-size: 1.2rem;
+  margin-bottom: 0;
 }
 
 /* ...existing code... */
 
 .tutor-section {
   background: white;
-  padding: 1.5rem;
+  padding: 2rem;
   border-radius: var(--radius);
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .add-slot-form {
@@ -245,54 +258,95 @@ Users\adity\Downloads\peertutoring\style.css
 .student-filters {
   margin: 2rem 0;
   display: flex;
-  gap: 1rem;
+  gap: 1.5rem;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .student-filters select {
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: var(--radius);
-  min-width: 150px;
+  padding: 0.75rem 1rem;
+  border: 2px solid #e1e5e9;
+  border-radius: 8px;
+  min-width: 180px;
+  font-size: 1rem;
+  background: white;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.student-filters select:focus,
+.student-filters select:hover {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(30, 144, 255, 0.1);
 }
 
 .slots-grid {
   display: grid;
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
   margin-top: 2rem;
+  padding: 0 1rem;
 }
 
 .available-slot-card {
   background: white;
-  padding: 1.2rem 1rem;
-  border-radius: var(--radius);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  border: 1px solid #f0f0f0;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
-  align-items: flex-start;
-  min-height: 110px;
-  /* width remains unchanged */
-  gap: 0.7em;
+  justify-content: space-between;
+  min-height: 180px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.available-slot-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  border-color: var(--primary);
+}
+
+.available-slot-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary), #4fb3d9);
 }
 
 /* Add these styles at the end of your CSS file */
 .loading, .error, .no-slots {
   text-align: center;
-  padding: 1rem;
-  background: var(--bg);
-  border-radius: var(--radius);
-  margin: 1rem 0;
+  padding: 3rem 2rem;
+  background: white;
+  border-radius: 12px;
+  margin: 2rem auto;
+  max-width: 500px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  border: 1px solid #f0f0f0;
+}
+
+.loading {
+  color: var(--primary);
+  font-size: 1.1rem;
 }
 
 .error {
-  color: #ff4444;
-  background: #ffeeee;
+  color: #dc3545;
+  background: #fff5f5;
+  border-color: #fed7d7;
 }
 
 .no-slots {
   color: #666;
   font-style: italic;
+  font-size: 1.05rem;
 }
 
 /* Disable form elements during submission */
@@ -302,20 +356,69 @@ form:disabled {
 }
 
 .available-slot-card p {
-  margin: 0.5rem 0;
+  margin: 0.4rem 0;
+  color: #666;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.available-slot-card .tutor-info {
+  margin-bottom: 1rem;
+}
+
+.available-slot-card .tutor-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 0.3rem;
+}
+
+.available-slot-card .subject {
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.available-slot-card .slot-details {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.available-slot-card .detail-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.available-slot-card .detail-icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
 }
 
 .available-slot-card button {
-  background: var(--tutor-primary);
+  background: linear-gradient(135deg, var(--primary), #4fb3d9);
   color: white;
   border: none;
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius);
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
   cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  margin-top: 1rem;
+  align-self: stretch;
+  box-shadow: 0 2px 8px rgba(30, 144, 255, 0.3);
 }
 
 .available-slot-card button:hover {
-  opacity: 0.9;
+  background: linear-gradient(135deg, #1c7ed6, var(--primary));
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(30, 144, 255, 0.4);
 }
 .info-icon {
   font-size: 14px;
@@ -382,15 +485,61 @@ form:disabled {
 }
 
 /* Mobile adjustments */
-@media (max-width: 480px) {
+@media (max-width: 768px) {
+  .content {
+    padding: 0.5rem;
+  }
+  
+  .tutor-section {
+    padding: 1rem;
+    margin: 0.5rem;
+  }
+  
+  .slots-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding: 0;
+  }
+  
+  .available-slot-card {
+    min-height: 160px;
+    padding: 1.25rem;
+  }
+  
+  .student-filters {
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+  
+  .student-filters select {
+    min-width: 100%;
+    max-width: 300px;
+  }
+  
   .top-bar {
     flex-direction: column;
     gap: 0.5rem;
+    padding: 1rem;
   }
   
   .top-bar .right-group {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .available-slot-card {
+    padding: 1rem;
+    min-height: 140px;
+  }
+  
+  .available-slot-card .tutor-name {
+    font-size: 1.1rem;
   }
 }
 
