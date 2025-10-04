@@ -21,6 +21,352 @@ import {
 } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+
+// ...existing code...
+
+// --- My Slots Panel Functionality ---
+const mySlotsBtn = document.getElementById('my-slots-btn');
+const mySlotsPanel = document.getElementById('my-slots-panel');
+const closePanelBtn = document.getElementById('close-slots-panel');
+const panelOverlay = document.querySelector('.slots-panel-overlay');
+const tutoringSlotsList = document.getElementById('tutoring-slots');
+const tutoredSlotsList = document.getElementById('tutored-slots');
+const tutoringEmpty = document.getElementById('tutoring-empty');
+const tutoredEmpty = document.getElementById('tutored-empty');
+
+// Panel open/close functionality
+function openSlotsPanel() {
+  mySlotsPanel.classList.add('open');
+  mySlotsPanel.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden'; // Prevent background scrolling
+  
+  // Focus management
+  closePanelBtn.focus();
+  
+  // Load slots data
+  loadMySlotsData();
+}
+
+function closeSlotsPanel() {
+  mySlotsPanel.classList.remove('open');
+  mySlotsPanel.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = ''; // Restore scrolling
+  
+  // Return focus to the button that opened the panel
+  mySlotsBtn.focus();
+}
+
+// Event listeners for panel
+if (mySlotsBtn) {
+  mySlotsBtn.addEventListener('click', openSlotsPanel);
+}
+
+if (closePanelBtn) {
+  closePanelBtn.addEventListener('click', closeSlotsPanel);
+}
+
+if (panelOverlay) {
+  panelOverlay.addEventListener('click', closeSlotsPanel);
+}
+
+// Keyboard navigation
+document.addEventListener('keydown', (e) => {
+  if (mySlotsPanel.classList.contains('open')) {
+    if (e.key === 'Escape') {
+      closeSlotsPanel();
+    }
+  }
+});
+
+// Function to load all slots data for the panel
+async function loadMySlotsData() {
+  if (!auth.currentUser) {
+    console.log('No user signed in');
+    return;
+  }
+
+  await Promise.all([
+    loadTutoringSlotsForPanel(),
+    loadTutoredSlotsForPanel()
+  ]);
+}
+
+// Function to load slots the user is tutoring
+async function loadTutoringSlotsForPanel() {
+  if (!tutoringSlotsList) return;
+  
+  tutoringSlotsList.innerHTML = '<div class="slots-loading">Loading your tutoring slots...</div>';
+  
+  try {
+    const userId = auth.currentUser.uid;
+    
+    // Get available slots created by this user (tutoring)
+    const availableSlotsQuery = query(
+      collection(db, 'slots'),
+      where('tutorId', '==', userId)
+    );
+    const availableSnapshot = await getDocs(availableSlotsQuery);
+    
+    // Get booked slots where this user is the tutor
+    const bookedSlotsQuery = query(
+      collection(db, 'bookedSlots'),
+      where('tutorId', '==', userId)
+    );
+    const bookedSnapshot = await getDocs(bookedSlotsQuery);
+    
+    const tutoringSlots = [];
+    
+    // Add available (unbooked) slots
+    availableSnapshot.forEach(doc => {
+      const data = doc.data();
+      tutoringSlots.push({
+        id: doc.id,
+        ...data,
+        status: 'available',
+        type: 'available'
+      });
+    });
+    
+    // Add booked slots where user is tutoring
+    bookedSnapshot.forEach(doc => {
+      const data = doc.data();
+      tutoringSlots.push({
+        id: doc.id,
+        ...data,
+        status: getSlotStatus(data),
+        type: 'booked'
+      });
+    });
+    
+    // Sort by date
+    tutoringSlots.sort((a, b) => {
+      const dateA = new Date(a.day + ' ' + a.startTime);
+      const dateB = new Date(b.day + ' ' + b.startTime);
+      return dateA - dateB;
+    });
+    
+    if (tutoringSlots.length === 0) {
+      tutoringSlotsList.innerHTML = '';
+      tutoringEmpty.style.display = 'block';
+    } else {
+      tutoringEmpty.style.display = 'none';
+      renderSlotsInPanel(tutoringSlots, tutoringSlotsList, 'tutoring');
+    }
+    
+  } catch (error) {
+    console.error('Error loading tutoring slots:', error);
+    tutoringSlotsList.innerHTML = '<div class="slots-loading" style="color: #dc2626;">Error loading tutoring slots</div>';
+  }
+}
+
+// Function to load slots the user is getting tutored in
+async function loadTutoredSlotsForPanel() {
+  if (!tutoredSlotsList) return;
+  
+  tutoredSlotsList.innerHTML = '<div class="slots-loading">Loading your tutored slots...</div>';
+  
+  try {
+    const userId = auth.currentUser.uid;
+    
+    // Get booked slots where this user is the student
+    const bookedSlotsQuery = query(
+      collection(db, 'bookedSlots'),
+      where('studentUid', '==', userId)
+    );
+    const bookedSnapshot = await getDocs(bookedSlotsQuery);
+    
+    const tutoredSlots = [];
+    
+    bookedSnapshot.forEach(doc => {
+      const data = doc.data();
+      tutoredSlots.push({
+        id: doc.id,
+        ...data,
+        status: getSlotStatus(data),
+        type: 'booked'
+      });
+    });
+    
+    // Sort by date
+    tutoredSlots.sort((a, b) => {
+      const dateA = new Date(a.day + ' ' + a.startTime);
+      const dateB = new Date(b.day + ' ' + b.startTime);
+      return dateA - dateB;
+    });
+    
+    if (tutoredSlots.length === 0) {
+      tutoredSlotsList.innerHTML = '';
+      tutoredEmpty.style.display = 'block';
+    } else {
+      tutoredEmpty.style.display = 'none';
+      renderSlotsInPanel(tutoredSlots, tutoredSlotsList, 'tutored');
+    }
+    
+  } catch (error) {
+    console.error('Error loading tutored slots:', error);
+    tutoredSlotsList.innerHTML = '<div class="slots-loading" style="color: #dc2626;">Error loading tutored slots</div>';
+  }
+}
+
+// Function to determine slot status
+function getSlotStatus(slotData) {
+  const now = new Date();
+  const slotDateTime = new Date(slotData.day + ' ' + slotData.startTime);
+  
+  if (slotData.cancelled) {
+    return 'cancelled';
+  } else if (slotDateTime < now) {
+    return 'completed';
+  } else {
+    return 'upcoming';
+  }
+}
+
+// Function to render slots in the panel
+function renderSlotsInPanel(slots, container, userRole) {
+  container.innerHTML = '';
+  
+  slots.forEach(slot => {
+    const slotElement = createSlotElement(slot, userRole);
+    container.appendChild(slotElement);
+  });
+}
+
+// Function to create individual slot elements
+function createSlotElement(slot, userRole) {
+  const slotDiv = document.createElement('div');
+  slotDiv.className = 'slot-item';
+  
+  const counterpartName = userRole === 'tutoring' ? 
+    (slot.studentName || 'No student yet') : 
+    (slot.tutorName || 'Tutor');
+  
+  const actionButtons = createActionButtons(slot, userRole);
+  
+  slotDiv.innerHTML = `
+    <div class="slot-item-header">
+      <div class="slot-subject">${slot.subject || slot.specificSubject || 'Subject'}</div>
+      <div class="slot-status ${slot.status}">${slot.status}</div>
+    </div>
+    <div class="slot-details">
+      <div class="slot-detail">
+        <span class="slot-detail-icon">📅</span>
+        <span>${formatDate(slot.day)}</span>
+      </div>
+      <div class="slot-detail">
+        <span class="slot-detail-icon">⏰</span>
+        <span>${formatTimeDisplay(slot.startTime)} - ${formatTimeDisplay(slot.endTime)}</span>
+      </div>
+      <div class="slot-detail">
+        <span class="slot-detail-icon">📍</span>
+        <span>${slot.location}</span>
+      </div>
+      ${slot.type === 'booked' ? `
+        <div class="slot-detail">
+          <span class="slot-detail-icon">${userRole === 'tutoring' ? '🎓' : '👨‍🏫'}</span>
+          <span>${counterpartName}</span>
+        </div>
+      ` : ''}
+    </div>
+    <div class="slot-actions">
+      ${actionButtons}
+    </div>
+  `;
+  
+  return slotDiv;
+}
+
+// Function to create action buttons based on slot and user role
+function createActionButtons(slot, userRole) {
+  const buttons = [];
+  
+  // View Details button (functional)
+  buttons.push(`<button class="slot-action-btn primary" onclick="viewSlotDetails('${slot.id}', '${slot.type}', '${userRole}')" aria-label="View slot details">View Details</button>`);
+  
+  if (slot.status === 'upcoming') {
+    if (slot.type === 'available') {
+      // Available slot actions (for tutors)
+      buttons.push(`<button class="slot-action-btn" onclick="showComingSoon('Edit')" aria-label="Edit slot">Edit</button>`);
+      buttons.push(`<button class="slot-action-btn" onclick="showComingSoon('Cancel')" aria-label="Cancel slot">Cancel</button>`);
+    } else {
+      // Booked slot actions
+      buttons.push(`<button class="slot-action-btn" onclick="showComingSoon('Start')" aria-label="Start session">Start</button>`);
+      buttons.push(`<button class="slot-action-btn" onclick="showComingSoon('Reschedule')" aria-label="Reschedule session">Reschedule</button>`);
+      buttons.push(`<button class="slot-action-btn" onclick="showComingSoon('Message')" aria-label="Send message">Message</button>`);
+      
+      if (userRole === 'tutored') {
+        buttons.push(`<button class="slot-action-btn" onclick="showComingSoon('Cancel Booking')" aria-label="Cancel booking">Cancel Booking</button>`);
+      }
+    }
+  }
+  
+  return buttons.join('');
+}
+
+// Function to format date for display
+function formatDate(dateStr) {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { 
+    weekday: 'short', 
+    month: 'short', 
+    day: 'numeric' 
+  });
+}
+
+// Function to show "Coming Soon" message
+function showComingSoon(action) {
+  alert(`${action} functionality coming soon!`);
+}
+
+// Function to view slot details (functional)
+function viewSlotDetails(slotId, slotType, userRole) {
+  // This will show detailed information about the slot
+  const collectionName = slotType === 'available' ? 'slots' : 'bookedSlots';
+  
+  getDoc(doc(db, collectionName, slotId)).then(docSnap => {
+    if (docSnap.exists()) {
+      const slotData = docSnap.data();
+      showSlotDetailsModal(slotData, userRole);
+    } else {
+      alert('Slot not found.');
+    }
+  }).catch(error => {
+    console.error('Error fetching slot details:', error);
+    alert('Error loading slot details.');
+  });
+}
+
+// Function to show slot details in a modal
+function showSlotDetailsModal(slotData, userRole) {
+  const modalHtml = `
+    <div class="modal" style="display: flex;">
+      <div class="modal-content">
+        <h2>Slot Details</h2>
+        <div style="margin: 1rem 0;">
+          <p><strong>Subject:</strong> ${slotData.subject || slotData.specificSubject}</p>
+          <p><strong>Date:</strong> ${formatDate(slotData.day)}</p>
+          <p><strong>Time:</strong> ${formatTimeDisplay(slotData.startTime)} - ${formatTimeDisplay(slotData.endTime)}</p>
+          <p><strong>Location:</strong> ${slotData.location}</p>
+          ${slotData.tutorName ? `<p><strong>Tutor:</strong> ${slotData.tutorName}</p>` : ''}
+          ${slotData.studentName ? `<p><strong>Student:</strong> ${slotData.studentName}</p>` : ''}
+          ${slotData.studentEmail ? `<p><strong>Student Email:</strong> ${slotData.studentEmail}</p>` : ''}
+          <p><strong>Status:</strong> ${getSlotStatus(slotData)}</p>
+        </div>
+        <button onclick="this.closest('.modal').remove()" style="background: var(--primary); color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">Close</button>
+      </div>
+    </div>
+  `;
+  
+  const modalDiv = document.createElement('div');
+  modalDiv.innerHTML = modalHtml;
+  document.body.appendChild(modalDiv.firstElementChild);
+}
+
+// Make functions globally accessible
+window.viewSlotDetails = viewSlotDetails;
+window.showComingSoon = showComingSoon;
+
+// ...existing code...
 const firebaseConfig = {
   apiKey: "AIzaSyBJtoUKftblVe4VbunzRXe0i6KUfTfu5sI",
   authDomain: "peer-tutoring-7626d.firebaseapp.com",
@@ -232,27 +578,168 @@ document.addEventListener('DOMContentLoaded', () => {
   createSubjectCheckboxes('help-needed-subjects', [], 'help-');
   createSubjectCheckboxes('tutoring-subjects', [], 'tutor-');
   
-  // --- Date dropdown for student filter ---
-  // Populate start time dropdown (hour and half-hour only)
+  // --- Custom Calendar for Slot Form ---
+  const slotCalendarContainer = document.getElementById('custom-calendar-container');
+  const dateInput = document.getElementById('slot-date');
+  const dateWarning = document.getElementById('date-warning');
+  let selectedDate = null;
+  // Track current calendar month/year for navigation
+  let calendarView = null;
+
+  function getMinMaxDates() {
+    const today = new Date();
+    const min = new Date(today);
+    min.setDate(today.getDate() + 2);
+    const max = new Date(today);
+    max.setDate(today.getDate() + 14);
+    return { min, max };
+  }
+
+  function formatDateForInput(date) {
+    return date.toISOString().split('T')[0];
+  }
+
+  function renderCustomCalendar(selected) {
+    const { min, max } = getMinMaxDates();
+    // Use calendarView if set, else use selected/min
+    let current;
+    if (calendarView) {
+      current = new Date(calendarView);
+    } else if (selected) {
+      current = new Date(selected);
+    } else {
+      current = new Date(min);
+    }
+    current.setDate(1);
+    let month = current.getMonth();
+    let year = current.getFullYear();
+    // Persist current view for navigation
+    calendarView = new Date(current);
+
+    // Clamp to min/max month if needed
+    const minMonth = min.getMonth();
+    const minYear = min.getFullYear();
+    const maxMonth = max.getMonth();
+    const maxYear = max.getFullYear();
+
+    // Calendar header
+    let html = `<div class="custom-calendar">
+      <div class="custom-calendar-header">
+        <button type="button" id="cal-prev" ${year === minYear && month === minMonth ? 'disabled' : ''}>&lt;</button>
+        <span>${current.toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
+        <button type="button" id="cal-next" ${year === maxYear && month === maxMonth ? 'disabled' : ''}>&gt;</button>
+      </div>
+      <div class="custom-calendar-days">
+        <div class="custom-calendar-day">Su</div>
+        <div class="custom-calendar-day">Mo</div>
+        <div class="custom-calendar-day">Tu</div>
+        <div class="custom-calendar-day">We</div>
+        <div class="custom-calendar-day">Th</div>
+        <div class="custom-calendar-day">Fr</div>
+        <div class="custom-calendar-day">Sa</div>
+      </div>
+      <div class="custom-calendar-days">`;
+    let firstDay = new Date(year, month, 1).getDay();
+    let daysInMonth = new Date(year, month + 1, 0).getDate();
+    let d = 1;
+    for (let i = 0; i < 6; i++) {
+      for (let j = 0; j < 7; j++) {
+        if (i === 0 && j < firstDay) {
+          html += `<div></div>`;
+        } else if (d > daysInMonth) {
+          html += `<div></div>`;
+        } else {
+          let thisDate = new Date(year, month, d);
+          let dateStr = formatDateForInput(thisDate);
+          let disabled = thisDate < min || thisDate > max;
+          let selectedClass = selected && dateStr === selected ? 'selected' : '';
+          html += `<div class="custom-calendar-date ${selectedClass} ${disabled ? 'disabled' : ''}" data-date="${dateStr}" ${disabled ? 'tabindex="-1"' : 'tabindex="0"'}>${d}</div>`;
+          d++;
+        }
+      }
+      if (d > daysInMonth) break;
+    }
+    html += `</div></div>`;
+  slotCalendarContainer.innerHTML = html;
+
+  // Navigation (attach after DOM update)
+  const prevBtn = slotCalendarContainer.querySelector('#cal-prev');
+  const nextBtn = slotCalendarContainer.querySelector('#cal-next');
+  if (prevBtn) {
+    prevBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      let prevMonth = new Date(year, month - 1, 1);
+      calendarView = prevMonth;
+      renderCustomCalendar(selectedDate);
+    });
+  }
+  if (nextBtn) {
+    nextBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      let nextMonth = new Date(year, month + 1, 1);
+      calendarView = nextMonth;
+      renderCustomCalendar(selectedDate);
+    });
+  }
+
+  // Date selection and hover (event delegation for robustness)
+  slotCalendarContainer.querySelector('.custom-calendar-days:last-child')?.addEventListener('click', function(e) {
+    const el = e.target.closest('.custom-calendar-date');
+    if (el && !el.classList.contains('disabled')) {
+      selectedDate = el.getAttribute('data-date');
+      dateInput.value = selectedDate;
+      // When selecting a date, set calendarView to that month
+      calendarView = new Date(selectedDate);
+      renderCustomCalendar(selectedDate);
+      dateWarning.style.display = 'none';
+    }
+  });
+  slotCalendarContainer.querySelector('.custom-calendar-days:last-child')?.addEventListener('mouseover', function(e) {
+    const el = e.target.closest('.custom-calendar-date');
+    if (el && !el.classList.contains('disabled') && !el.classList.contains('selected')) {
+      el.style.background = 'var(--primary)';
+      el.style.color = '#fff';
+    }
+  });
+  slotCalendarContainer.querySelector('.custom-calendar-days:last-child')?.addEventListener('mouseout', function(e) {
+    const el = e.target.closest('.custom-calendar-date');
+    if (el && !el.classList.contains('disabled') && !el.classList.contains('selected')) {
+      el.style.background = '';
+      el.style.color = '';
+    }
+  });
+  }
+
+  // Initial render
+  calendarView = null;
+  renderCustomCalendar();
+
+  // --- Time Dropdown for Slot Form ---
   function populateStartTimeDropdown() {
     const startTimeSelect = document.getElementById('start-time');
     if (!startTimeSelect) return;
     startTimeSelect.innerHTML = '';
-    // Allow times from 7:00 to 18:30 (7am to 6:30pm)
-    for (let hour = 7; hour <= 18; hour++) {
-      [0, 30].forEach(min => {
-        const h = hour.toString().padStart(2, '0');
-        const m = min.toString().padStart(2, '0');
-        const value = `${h}:${m}`;
-        const ampm = hour < 12 ? 'AM' : 'PM';
-        let displayHour = hour % 12;
-        if (displayHour === 0) displayHour = 12;
-        const display = `${displayHour}:${m === '00' ? '00' : '30'} ${ampm}`;
-        const opt = document.createElement('option');
-        opt.value = value;
-        opt.textContent = display;
-        startTimeSelect.appendChild(opt);
-      });
+    // 6:00 AM to 8:00 AM
+    for (let h = 6; h <= 8; h++) {
+      for (let m of [0, 30]) {
+        if (h === 8 && m > 0) continue;
+        let hour = h;
+        let ampm = 'AM';
+        let label = `${hour}:${m === 0 ? '00' : '30'} ${ampm}`;
+        let value = `${hour.toString().padStart(2, '0')}:${m === 0 ? '00' : '30'}`;
+        startTimeSelect.innerHTML += `<option value="${value}">${label}</option>`;
+      }
+    }
+    // 4:00 PM to 9:00 PM
+    for (let h = 16; h <= 21; h++) {
+      for (let m of [0, 30]) {
+        if (h === 21 && m > 0) continue;
+        let hour = h > 12 ? h - 12 : h;
+        let ampm = 'PM';
+        let label = `${hour}:${m === 0 ? '00' : '30'} ${ampm}`;
+        let value = `${h.toString().padStart(2, '0')}:${m === 0 ? '00' : '30'}`;
+        startTimeSelect.innerHTML += `<option value="${value}">${label}</option>`;
+      }
     }
   }
   populateStartTimeDropdown();
@@ -289,60 +776,33 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   renderDateDropdown();
   populateStartTimeDropdown();
-  // Initialize date input restrictions
-  const dateInput = document.getElementById('slot-date');
-  const dateWarning = document.getElementById('date-warning');
-  const { min, max } = getMinMaxDates();
 
-  // Format dates for input[type="date"]
-  const minStr = min.toISOString().split('T')[0];
-  const maxStr = max.toISOString().split('T')[0];
-  dateInput.min = minStr;
-  dateInput.max = maxStr;
-
-  // --- Day select auto-update logic for slot form ---
-  const daySelect = document.getElementById('day-select');
+  // --- Date validation for slot form ---
   function validateDateInput() {
-    const value = dateInput.value;
-    let showWarning = false;
-    let warningText = '';
-    if (!value) {
-      showWarning = true;
-      warningText = `DATE HAS TO BE WITHIN THESE DATES: ${minStr} to ${maxStr}`;
-    } else {
-      const date = new Date(value);
-      if (isNaN(date.getTime()) || date < min || date > max) {
-        showWarning = true;
-        warningText = `DATE HAS TO BE WITHIN THESE DATES: ${minStr} to ${maxStr}`;
-      }
+    const { min, max } = getMinMaxDates();
+    if (!dateInput.value) {
+      dateWarning.textContent = 'Please select a date.';
+      dateWarning.style.display = 'block';
+      return false;
     }
-    dateWarning.style.display = showWarning ? 'block' : 'none';
-    dateWarning.textContent = showWarning ? warningText : '';
+    const selected = new Date(dateInput.value);
+    if (selected < min || selected > max) {
+      dateWarning.textContent = `Date must be between ${formatDateForInput(min)} and ${formatDateForInput(max)}.`;
+      dateWarning.style.display = 'block';
+      return false;
+    }
+    dateWarning.style.display = 'none';
+    return true;
   }
 
-  dateInput.addEventListener('change', function () {
-    const value = this.value;
-    if (!value) {
-      daySelect.innerHTML = '<option value="">Day will be set automatically</option>';
-      daySelect.disabled = true;
-    } else {
-      const date = new Date(value);
-      if (isNaN(date.getTime())) {
-        daySelect.innerHTML = '<option value="">Day will be set automatically</option>';
-        daySelect.disabled = true;
-      } else {
-        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const dayName = days[date.getDay()];
-        daySelect.innerHTML = `<option value="${dayName}" selected>${dayName}</option>`;
-        daySelect.disabled = false;
-      }
+  // Validate on form submit
+  const slotForm = document.getElementById('slot-form');
+  slotForm.addEventListener('submit', (e) => {
+    if (!validateDateInput()) {
+      e.preventDefault();
+      return false;
     }
-    validateDateInput();
   });
-
-  // Validate on page load and whenever date input changes
-  validateDateInput();
-  dateInput.addEventListener('input', validateDateInput);
 
   // Initial cleanup and load
   cleanupExpiredSlots();
@@ -581,6 +1041,11 @@ slotForm.addEventListener('submit', async (e) => {
     languageLevelContainer.style.display = 'none';
     buildingSelectContainer.style.display = 'none';
     await loadTutorSlots();
+    
+    // Refresh My Slots panel if it's open
+    if (mySlotsPanel && mySlotsPanel.classList.contains('open')) {
+      await loadMySlotsData();
+    }
 
     alert('Slot created successfully!');
   } catch (error) {
@@ -684,8 +1149,12 @@ async function loadTutorSlots() {
 
 async function loadAvailableSlots() {
   try {
+    // Add rate limiting protection
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
     const { min } = getMinMaxDates();
-    availableSlots.innerHTML = '';
+    availableSlots.innerHTML = '<div class="loading">Loading available slots...</div>';
+    
     let slotsQuery = query(
       collection(db, 'slots'),
       where('date', '>=', min.toISOString().split('T')[0])
@@ -757,6 +1226,11 @@ async function loadAvailableSlots() {
     }
   } catch (error) {
     console.error('Error loading available slots:', error);
+    if (error.code === 'resource-exhausted') {
+      availableSlots.innerHTML = '<div class="error">Too many requests. Please wait a moment and try again.</div>';
+    } else {
+      availableSlots.innerHTML = '<div class="error">Error loading slots. Please try again.</div>';
+    }
   }
 }
 async function cleanupExpiredSlots() {
@@ -888,8 +1362,54 @@ async function openBookingModal(slotId) {
     return times;
   }
 
-  // Remove dropdowns and show info only
-  form.innerHTML = `<div style="text-align:center;padding:1em;">To book this slot, please contact the tutor directly.</div>`;
+  // Show booking confirmation UI
+  form.innerHTML = `
+    <div style="text-align:center;padding:1em 0 0.5em 0;">
+      <span style="font-size:1.2em; color:var(--primary); font-weight:600;">Book this slot?</span><br>
+      <span style="color:#444; font-size:1em;">You will be added as the student for this session.</span>
+    </div>
+    <button type="submit" style="margin:1.2em auto 0 auto; display:block; background:linear-gradient(90deg, var(--primary), #4fb3d9); color:white; font-size:1.1em; font-weight:600; border:none; border-radius:8px; padding:0.7em 2em; box-shadow:0 2px 8px rgba(30,144,255,0.15); cursor:pointer; transition:all 0.2s;">Confirm Booking</button>
+  `;
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    if (!auth.currentUser) {
+      alert('Please sign in to book slots');
+      return;
+    }
+    // Prevent double booking
+    if (slot.bookedBy || slot.studentUid) {
+      alert('This slot is already booked.');
+      modal.style.display = 'none';
+      return;
+    }
+    try {
+      // Create booked slot record
+      await addDoc(collection(db, 'bookedSlots'), {
+        ...slot,
+        studentUid: auth.currentUser.uid,
+        studentName: auth.currentUser.displayName || '',
+        bookedAt: new Date().toISOString(),
+        originalCreatedAt: slot.createdAt
+      });
+      
+      // Delete the original slot
+      await deleteDoc(doc(db, 'slots', slotId));
+      
+      infoDiv.innerHTML = `<div style='color:var(--primary);font-size:1.1em;font-weight:600;text-align:center;margin:1em 0;'>Slot booked successfully!</div>`;
+      form.innerHTML = '';
+      setTimeout(() => { 
+        modal.style.display = 'none'; 
+        loadAvailableSlots(); 
+        // Refresh My Slots panel if it's open
+        if (mySlotsPanel && mySlotsPanel.classList.contains('open')) {
+          loadMySlotsData();
+        }
+      }, 1200);
+    } catch (err) {
+      console.error('Booking error:', err);
+      infoDiv.innerHTML = `<div style='color:#c00;font-size:1em;text-align:center;margin:1em 0;'>Error booking slot. Please try again.</div>`;
+    }
+  };
   modal.style.display = 'flex';
 }
 
@@ -924,6 +1444,11 @@ onAuthStateChanged(auth, async user => {
       profilePic.src = user.photoURL || 'avatar-placeholder.png';
     }
     
+    // Show My Slots button when signed in
+    if (mySlotsBtn) {
+      mySlotsBtn.style.display = 'flex';
+    }
+    
     if (roleSelect.value === 'student') {
       studentSection.style.display = 'block';
       tutorSection.style.display = 'none';
@@ -941,6 +1466,11 @@ onAuthStateChanged(auth, async user => {
     tutorSection.style.display = 'block';
     // Set just the role text when not signed in
     currentRole.textContent = roleSelect.value[0].toUpperCase() + roleSelect.value.slice(1);
+    
+    // Hide My Slots button when not signed in
+    if (mySlotsBtn) {
+      mySlotsBtn.style.display = 'none';
+    }
   }
 });
 
