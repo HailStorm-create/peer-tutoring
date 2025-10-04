@@ -15,6 +15,12 @@
         <option value="student">Student View</option>
       </select>
     </div>
+    <div class="center-group">
+      <button id="my-slots-btn" style="display: none;" aria-label="Open My Slots panel">
+        <span class="my-slots-icon">📅</span>
+        My Slots
+      </button>
+    </div>
     <div class="right-group">
       <button id="sign-btn">Sign In</button>
       <button id="settings-btn" style="display: none;">Settings</button>
@@ -23,12 +29,11 @@
     </div>
   </nav>
 
+
   <main class="content">
-    <section class="hero tutor-section">
+    <section class="hero tutor-section" id="available-section">
       <h1>Welcome to CCA Peer Tutoring</h1>
       <p>Find available tutoring slots below</p>
-      
-      <!-- Add filters for students -->
       <div class="student-filters">
         <select id="student-subject-filter">
           <option value="">All Subjects</option>
@@ -41,44 +46,40 @@
         </select>
         <div id="student-calendar-filter"></div>
       </div>
-
-      <!-- Container for available slots -->
       <div id="available-slots" class="slots-grid"></div>
     </section>
 
-    <section class="student-section" style="display: none;">
+    <section class="student-section" style="display: none;" id="student-section">
       <h2>My Availability Slots</h2>
-      <div class="add-slot-form">
-        <h3>Add New Slot</h3>
+      <div class="add-slot-form centered-slot-form">
+        <h3 style="text-align:center;margin-bottom:1.2rem;">Add New Slot</h3>
         <form id="slot-form">
           <div class="form-group">
-            <label for="slot-date">Date: <i class="info-icon" title="Select a date between 2 days and 2 weeks from now">ⓘ</i></label>
-            <input type="date" id="slot-date" required>
-            <div id="date-warning" style="color: #ff4444; display: none; font-size: 0.95em; margin-top: 0.3em;"></div>
+            <label for="custom-calendar">Date:</label>
+            <div id="custom-calendar-container"></div>
+            <input type="hidden" id="slot-date" required>
+            <div id="date-warning" class="date-warning"></div>
           </div>
-          <select id="day-select" required disabled>
-            <option value="">Day will be set automatically</option>
-          </select>
-          <!-- Replace the existing time-select input with this -->
-          <div class="time-range">
-            <div class="time-input">
-              <label for="start-time">Start Time: <i class="info-icon" title="Pick a start time (hour or half-hour only)">ⓘ</i></label>
-              <select id="start-time" required></select>
-            </div>
-            <div class="time-input">
-              <label for="duration">Duration:</label>
-              <select id="duration" required>
-                <option value="30">30 minutes</option>
-                <option value="60">1 hour</option>
-              </select>
-            </div>
+          <div class="form-group">
+            <label for="start-time">Start Time:</label>
+            <select id="start-time" required></select>
           </div>
-          <select id="location-select" required>
-            <option value="">Select Location</option>
-            <option>Library</option>
-            <option>Cafeteria</option>
-            <option value="school">School Building</option>
-          </select>
+          <div class="form-group">
+            <label for="duration">Duration:</label>
+            <select id="duration" required>
+              <option value="30">30 minutes</option>
+              <option value="60">1 hour</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="location-select">Location:</label>
+            <select id="location-select" required>
+              <option value="">Select Location</option>
+              <option>Library</option>
+              <option>Cafeteria</option>
+              <option value="school">School Building</option>
+            </select>
+          </div>
           <div id="building-select-container" style="display: none;">
             <select id="building-select" required>
               <option value="">Select Building</option>
@@ -87,23 +88,23 @@
               <option value="">Select Room</option>
             </select>
           </div>
-          <!-- Two-level subject selection -->
-          <select id="subject-category" required>
-            <option value="">Select Subject Category</option>
-            <option value="english">English</option>
-            <option value="history">History</option>
-            <option value="math">Math</option>
-            <option value="science">Science</option>
-            <option value="other">Other</option>
-            <option value="languages">Languages</option>
-          </select>
-
+          <div class="form-group">
+            <label for="subject-category">Subject Category:</label>
+            <select id="subject-category" required>
+              <option value="">Select Subject Category</option>
+              <option value="english">English</option>
+              <option value="history">History</option>
+              <option value="math">Math</option>
+              <option value="science">Science</option>
+              <option value="other">Other</option>
+              <option value="languages">Languages</option>
+            </select>
+          </div>
           <div id="specific-subject-container" style="display: none;">
             <select id="specific-subject" required>
               <option value="">Select Specific Course</option>
             </select>
           </div>
-
           <div id="language-level-container" style="display: none;">
             <label for="language-level">Level:</label>
             <select id="language-level" required>
@@ -116,12 +117,63 @@
               <option value="AP">AP</option>
             </select>
           </div>
-          <button type="submit">Add Slot</button>
+          <button type="submit" class="add-slot-btn">Add Slot</button>
         </form>
       </div>
       <div id="slots-list"></div>
     </section>
   </main>
+
+  <!-- My Slots Side Panel -->
+  <div id="my-slots-panel" class="slots-panel" role="dialog" aria-labelledby="my-slots-title" aria-hidden="true">
+    <div class="slots-panel-overlay" aria-hidden="true"></div>
+    <div class="slots-panel-content">
+      <div class="slots-panel-header">
+        <h2 id="my-slots-title">My Slots</h2>
+        <button id="close-slots-panel" class="close-panel-btn" aria-label="Close My Slots panel">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      
+      <div class="slots-panel-body">
+        <div class="slots-section">
+          <h3 class="slots-section-title">
+            <span class="section-icon">👨‍🏫</span>
+            Slots I'm Tutoring
+          </h3>
+          <div id="tutoring-slots" class="slots-list">
+            <div class="slots-loading">Loading your tutoring slots...</div>
+          </div>
+          <div id="tutoring-empty" class="empty-state" style="display: none;">
+            <div class="empty-icon">📚</div>
+            <h4>No tutoring slots yet</h4>
+            <p>Ready to share your knowledge? Add your availability to help other students.</p>
+            <button class="empty-action-btn" onclick="document.getElementById('role-select').value='tutor'; document.getElementById('role-select').dispatchEvent(new Event('change'));">
+              Add Availability
+            </button>
+          </div>
+        </div>
+
+        <div class="slots-section">
+          <h3 class="slots-section-title">
+            <span class="section-icon">🎓</span>
+            Slots I'm Getting Tutored
+          </h3>
+          <div id="tutored-slots" class="slots-list">
+            <div class="slots-loading">Loading your tutored slots...</div>
+          </div>
+          <div id="tutored-empty" class="empty-state" style="display: none;">
+            <div class="empty-icon">🔍</div>
+            <h4>No tutoring sessions booked</h4>
+            <p>Need help with a subject? Browse available tutors and book a session.</p>
+            <button class="empty-action-btn" onclick="document.getElementById('role-select').value='student'; document.getElementById('role-select').dispatchEvent(new Event('change'));">
+              Browse Tutors
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Load Firebase logic -->
   <script type="module" src="actual.js"></script>
