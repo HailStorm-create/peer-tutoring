@@ -36,7 +36,7 @@
       <p>Find available tutoring slots below</p>
       <div class="student-filters">
         <select id="student-subject-filter">
-          <option value="">All Subjects</option>
+          <option value="">Select Subject Category</option>
           <option value="english">English</option>
           <option value="history">History</option>
           <option value="math">Math</option>
@@ -44,6 +44,24 @@
           <option value="other">Other</option>
           <option value="languages">Languages</option>
         </select>
+        <div id="specific-subject-container" style="display: none;">
+          <select id="specific-subject">
+            <option value="">Select Specific Course</option>
+          </select>
+        </div>
+        <div id="language-level-container" style="display: none;">
+          <label for="language-level">Level:</label>
+          <select id="language-level">
+            <option value="">Select Level</option>
+            <option value="1">Level 1</option>
+            <option value="2">Level 2</option>
+            <option value="3">Level 3</option>
+            <option value="4">Level 4</option>
+            <option value="5">Level 5</option>
+            <option value="AP">AP</option>
+
+          </select>
+        </div>
         <div id="student-calendar-filter"></div>
       </div>
       <div id="available-slots" class="slots-grid"></div>
@@ -100,14 +118,14 @@
               <option value="languages">Languages</option>
             </select>
           </div>
-          <div id="specific-subject-container" style="display: none;">
-            <select id="specific-subject" required>
+          <div id="form-specific-subject-container" style="display: none;">
+            <select id="form-specific-subject" required>
               <option value="">Select Specific Course</option>
             </select>
           </div>
-          <div id="language-level-container" style="display: none;">
-            <label for="language-level">Level:</label>
-            <select id="language-level" required>
+          <div id="form-language-level-container" style="display: none;">
+            <label for="form-language-level">Level:</label>
+            <select id="form-language-level">
               <option value="">Select Level</option>
               <option value="1">Level 1</option>
               <option value="2">Level 2</option>
