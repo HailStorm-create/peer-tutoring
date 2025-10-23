@@ -100,12 +100,6 @@ async function loadTutoringSlotsForPanel() {
   try {
     const userId = auth.currentUser.uid;
     
-    // Get available slots created by this user (tutoring)
-    const availableSlotsQuery = query(
-      collection(db, 'slots'),
-      where('tutorId', '==', userId)
-    );
-    const availableSnapshot = await getDocs(availableSlotsQuery);
     
     // Get booked slots where this user is the tutor
     const bookedSlotsQuery = query(
@@ -116,16 +110,6 @@ async function loadTutoringSlotsForPanel() {
     
     const tutoringSlots = [];
     
-    // Add available (unbooked) slots
-    availableSnapshot.forEach(doc => {
-      const data = doc.data();
-      tutoringSlots.push({
-        id: doc.id,
-        ...data,
-        status: 'available',
-        type: 'available'
-      });
-    });
     
     // Add booked slots where user is tutoring
     bookedSnapshot.forEach(doc => {
@@ -138,10 +122,10 @@ async function loadTutoringSlotsForPanel() {
       });
     });
     
-    // Sort by date
+    // Sort by date - use slotData.date instead of slotData.day
     tutoringSlots.sort((a, b) => {
-      const dateA = new Date(a.day + ' ' + a.startTime);
-      const dateB = new Date(b.day + ' ' + b.startTime);
+      const dateA = new Date(`${a.date}T${a.startTime}`);
+      const dateB = new Date(`${b.date}T${b.startTime}`);
       return dateA - dateB;
     });
     
@@ -187,10 +171,10 @@ async function loadTutoredSlotsForPanel() {
       });
     });
     
-    // Sort by date
+    // Sort by date - use slotData.date instead of slotData.day
     tutoredSlots.sort((a, b) => {
-      const dateA = new Date(a.day + ' ' + a.startTime);
-      const dateB = new Date(b.day + ' ' + b.startTime);
+      const dateA = new Date(`${a.date}T${a.startTime}`);
+      const dateB = new Date(`${b.date}T${b.startTime}`);
       return dateA - dateB;
     });
     
@@ -211,7 +195,8 @@ async function loadTutoredSlotsForPanel() {
 // Function to determine slot status
 function getSlotStatus(slotData) {
   const now = new Date();
-  const slotDateTime = new Date(slotData.day + ' ' + slotData.startTime);
+  // Use slotData.date instead of slotData.day for the date calculation
+  const slotDateTime = new Date(`${slotData.date}T${slotData.startTime}`);
   
   if (slotData.cancelled) {
     return 'cancelled';
@@ -251,7 +236,7 @@ function createSlotElement(slot, userRole) {
     <div class="slot-details">
       <div class="slot-detail">
         <span class="slot-detail-icon">📅</span>
-        <span>${formatDate(slot.day)}</span>
+        <span>${formatDate(slot.date)}</span>
       </div>
       <div class="slot-detail">
         <span class="slot-detail-icon">⏰</span>
@@ -290,10 +275,10 @@ function createActionButtons(slot, userRole) {
       buttons.push(`<button class="slot-action-btn" onclick="showComingSoon('Cancel')" aria-label="Cancel slot">Cancel</button>`);
     } else {
       // Booked slot actions
-      buttons.push(`<button class="slot-action-btn" onclick="showComingSoon('Start')" aria-label="Start session">Start</button>`);
-      buttons.push(`<button class="slot-action-btn" onclick="showComingSoon('Reschedule')" aria-label="Reschedule session">Reschedule</button>`);
-      buttons.push(`<button class="slot-action-btn" onclick="showComingSoon('Message')" aria-label="Send message">Message</button>`);
-      
+      if (userRole === "student") {
+        buttons.push(`<button class="slot-action-btn" onclick="showComingSoon('Cancel')" aria-label="Cancel session">Cancel</button>`);
+      }
+
       if (userRole === 'tutored') {
         buttons.push(`<button class="slot-action-btn" onclick="showComingSoon('Cancel Booking')" aria-label="Cancel booking">Cancel Booking</button>`);
       }
@@ -365,6 +350,134 @@ function showSlotDetailsModal(slotData, userRole) {
 // Make functions globally accessible
 window.viewSlotDetails = viewSlotDetails;
 window.showComingSoon = showComingSoon;
+
+// Test function for Google Sheets (for debugging)
+window.testGoogleSheets = async function() {
+  console.log('Testing Google Sheets configuration...');
+  console.log('Configuration:', {
+    apiKey: GOOGLE_SHEETS_CONFIG.apiKey ? 'Present' : 'Missing',
+    spreadsheetId: GOOGLE_SHEETS_CONFIG.spreadsheetId ? 'Present' : 'Missing',
+    range: GOOGLE_SHEETS_CONFIG.range,
+    isConfigured: isGoogleSheetsConfigured()
+  });
+  
+  const testData = {
+    tutorName: 'Test Tutor',
+    tutorEmail: 'tutor@test.com',
+    studentName: 'Test Student', 
+    studentEmail: 'student@test.com',
+    subject: 'Test Subject',
+    day: '2025-10-04',
+    startTime: '10:00',
+    endTime: '11:00',
+    location: 'Test Location'
+  };
+  
+  const result = await writeBookingToGoogleSheets(testData);
+  console.log('Test result:', result);
+  return result;
+};
+
+// Google Sheets API configuration
+// SETUP INSTRUCTIONS:
+// 1. Go to Google Cloud Console (console.cloud.google.com)
+// 2. Create a new project or select existing project
+// 3. Enable Google Sheets API
+// 4. Create credentials (API Key) with proper restrictions
+// 5. Create a Google Sheet and get its ID from the URL
+// 6. Make sure the sheet has a tab called "Bookings" with headers in row 1:
+//    A1: Timestamp, B1: Tutor Name, C1: Tutor Email, D1: Student Name, E1: Student Email,
+//    F1: Subject, G1: Date, H1: Start Time, I1: End Time, J1: Location
+// 7. Make the sheet publicly viewable or share with your service account
+const GOOGLE_SHEETS_CONFIG = {
+  webAppUrl: 'https://script.google.com/macros/s/AKfycbz3vbMOOIYNTHHM9m1YCSyK9bMGHG8xGUbWOlexea7KSHM-NbbFch1NaULzHyiikTpL/exec' // Paste the URL from Apps Script deployment
+};
+// Function to check if Google Sheets is properly configured
+function isGoogleSheetsConfigured() {
+  return GOOGLE_SHEETS_CONFIG.apiKey && GOOGLE_SHEETS_CONFIG.apiKey.length > 10 && 
+         GOOGLE_SHEETS_CONFIG.spreadsheetId && GOOGLE_SHEETS_CONFIG.spreadsheetId.length > 10 &&
+         GOOGLE_SHEETS_CONFIG.apiKey !== 'YOUR_API_KEY_HERE' && 
+         GOOGLE_SHEETS_CONFIG.spreadsheetId !== 'YOUR_SPREADSHEET_ID_HERE';
+}
+
+async function writeBookingToGoogleSheets(bookingData) {
+  try {
+    const response = await fetch(GOOGLE_SHEETS_CONFIG.webAppUrl, {
+      method: 'POST',
+      body: JSON.stringify({
+        timestamp: new Date().toISOString(),
+        tutorName: bookingData.tutorName || 'N/A',
+        tutorEmail: bookingData.tutorEmail || 'N/A',
+        studentName: bookingData.studentName || 'N/A',
+        studentEmail: bookingData.studentEmail || 'N/A',
+        subject: bookingData.subject || 'N/A',
+        date: bookingData.date || 'N/A',
+        startTime: bookingData.startTime || 'N/A',
+        endTime: bookingData.endTime || 'N/A',
+        location: bookingData.location || 'N/A'
+      })
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      console.log('Successfully wrote booking to Google Sheets');
+    } else {
+      console.error('Google Sheets write failed:', result.error);
+    }
+  } catch (error) {
+    console.error('Error writing to Google Sheets:', error);
+  }
+}
+
+// Function to initialize Google Sheets (create headers if sheet is empty)
+async function initializeGoogleSheetsHeaders() {
+  if (!isGoogleSheetsConfigured()) {
+    return false;
+  }
+
+  try {
+    const headers = [
+      'Timestamp',
+      'Tutor Name',
+      'Tutor Email',
+      'Student Name',
+      'Student Email',
+      'Subject',
+      'Date',
+      'Start Time',
+      'End Time',
+      'Location'
+    ];
+
+    const response = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEETS_CONFIG.spreadsheetId}/values/Bookings!A1:J1?key=${GOOGLE_SHEETS_CONFIG.apiKey}`
+    );
+
+    if (response.ok) {
+      const result = await response.json();
+      // If no values or empty, add headers
+      if (!result.values || result.values.length === 0) {
+        await fetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEETS_CONFIG.spreadsheetId}/values/Bookings!A1:J1?valueInputOption=RAW&key=${GOOGLE_SHEETS_CONFIG.apiKey}`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              values: [headers]
+            })
+          }
+        );
+        console.log('Google Sheets headers initialized');
+      }
+    }
+    return true;
+  } catch (error) {
+    console.error('Error initializing Google Sheets headers:', error);
+    return false;
+  }
+}
 
 // ...existing code...
 const firebaseConfig = {
@@ -844,30 +957,35 @@ buildings.forEach(building => {
 // Subject category selection handler
 subjectCategory.addEventListener('change', (e) => {
   const category = e.target.value;
-  specificSubject.innerHTML = '<option value="">Select Specific Course</option>';
+  const formSpecificSubjectContainer = document.getElementById('form-specific-subject-container');
+  const formSpecificSubject = document.getElementById('form-specific-subject');
+  const formLanguageLevelContainer = document.getElementById('form-language-level-container');
+  const formLanguageLevel = document.getElementById('form-language-level');
+  
+  formSpecificSubject.innerHTML = '<option value="">Select Specific Course</option>';
   
   if (category && subjectData[category]) {
-    specificSubjectContainer.style.display = 'block';
+    formSpecificSubjectContainer.style.display = 'block';
     
     subjectData[category].forEach(course => {
       const option = document.createElement('option');
       option.value = course;
       option.textContent = course;
-      specificSubject.appendChild(option);
+      formSpecificSubject.appendChild(option);
     });
     
     // Show language level dropdown for languages
     if (category === 'languages') {
-      languageLevelContainer.style.display = 'block';
-      languageLevel.required = true;
+      formLanguageLevelContainer.style.display = 'block';
+      formLanguageLevel.required = true;
     } else {
-      languageLevelContainer.style.display = 'none';
-      languageLevel.required = false;
+      formLanguageLevelContainer.style.display = 'none';
+      formLanguageLevel.required = false;
     }
   } else {
-    specificSubjectContainer.style.display = 'none';
-    languageLevelContainer.style.display = 'none';
-    languageLevel.required = false;
+    formSpecificSubjectContainer.style.display = 'none';
+    formLanguageLevelContainer.style.display = 'none';
+    formLanguageLevel.required = false;
   }
 });
 
@@ -898,7 +1016,54 @@ buildingSelect.addEventListener('change', (e) => {
   });
 });
 
-studentSubjectFilter.addEventListener('change', loadAvailableSlots);
+// Student subject filter cascading dropdowns
+studentSubjectFilter.addEventListener('change', (e) => {
+  const specificSubjectContainer = document.getElementById('specific-subject-container');
+  const specificSubject = document.getElementById('specific-subject');
+  const languageLevelContainer = document.getElementById('language-level-container');
+  const languageLevel = document.getElementById('language-level');
+  
+  specificSubjectContainer.style.display = e.target.value ? 'block' : 'none';
+  specificSubject.innerHTML = '<option value="">Select Specific Course</option>';
+  languageLevelContainer.style.display = 'none';
+  languageLevel.innerHTML = '<option value="">Select Level</option>';
+  
+  if (e.target.value && subjectData[e.target.value]) {
+    subjectData[e.target.value].forEach(subject => {
+      const option = document.createElement('option');
+      option.value = subject;
+      option.textContent = subject;
+      specificSubject.appendChild(option);
+    });
+  }
+  loadAvailableSlots();
+});
+
+document.getElementById('specific-subject')?.addEventListener('change', (e) => {
+  const languageLevelContainer = document.getElementById('language-level-container');
+  const languageLevel = document.getElementById('language-level');
+  const subjectCategory = document.getElementById('student-subject-filter').value;
+  
+  // Only show level dropdown for languages
+  if (subjectCategory === 'languages' && e.target.value) {
+    languageLevelContainer.style.display = 'block';
+    languageLevel.innerHTML = '<option value="">Select Level</option>';
+    
+    const levels = ['1', '2', '3', '4', '5', 'AP'];
+    levels.forEach(level => {
+      const option = document.createElement('option');
+      option.value = level;
+      option.textContent = `Level ${level}`;
+      languageLevel.appendChild(option);
+    });
+  } else {
+    languageLevelContainer.style.display = 'none';
+    languageLevel.innerHTML = '<option value="">Select Level</option>';
+  }
+  loadAvailableSlots();
+});
+
+document.getElementById('language-level')?.addEventListener('change', loadAvailableSlots);
 
 // Settings button functionality
 settingsBtn?.addEventListener('click', async () => {
@@ -960,8 +1125,8 @@ slotForm.addEventListener('submit', async (e) => {
     const duration = parseInt(document.getElementById('duration').value, 10);
     const location = document.getElementById('location-select').value;
     const subjectCat = document.getElementById('subject-category').value;
-    const specificSubj = document.getElementById('specific-subject').value;
-    const langLevel = document.getElementById('language-level').value;
+    const specificSubj = document.getElementById('form-specific-subject').value;
+    const langLevel = document.getElementById('form-language-level').value;
 
     // Validate all required fields
     if (!date || !startTime || !duration || !location || !subjectCat || !specificSubj) {
@@ -1021,6 +1186,7 @@ slotForm.addEventListener('submit', async (e) => {
     const slotData = {
       tutorId: auth.currentUser.uid,
       tutorName: `${userData.firstName} ${userData.lastName}`,
+      tutorEmail: auth.currentUser.email || '',
       tutorPhotoBase64: userData.profilePhotoBase64 || 'avatar-placeholder.png',
       date: date,
       day: new Date(date).toLocaleDateString('en-US', { weekday: 'long' }),
@@ -1160,25 +1326,47 @@ async function loadAvailableSlots() {
       where('date', '>=', min.toISOString().split('T')[0])
     );
     const slotsSnapshot = await getDocs(slotsQuery);
-    // Filter by subject and selected date
-  const subjectCategory = studentSubjectFilter.value;
-  const date = selectedCalendarDate;
+    
+    // Filter by subject category, specific subject, level, and selected date
+    const subjectCategory = studentSubjectFilter.value;
+    const specificSubject = document.getElementById('specific-subject')?.value || '';
+    const level = document.getElementById('language-level')?.value || '';
+    const date = selectedCalendarDate;
+    
     let found = false;
+    
     // Helper to format time
     function formatTime(time) {
       return new Date(`2000-01-01T${time}`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
     }
+    
     // Collect all tutorIds to fetch their profiles in one go
     const tutorIds = new Set();
     slotsSnapshot.forEach(doc => {
       const slotData = doc.data();
-      // Filter by subject category instead of exact subject match
-      const matchesSubject = subjectCategory === '' || slotData.subjectCategory === subjectCategory;
+      // Filter by subject category, specific subject, level, and date
+      const matchesCategory = subjectCategory === '' || slotData.subjectCategory === subjectCategory;
+      
+      // For specific subject matching, check if level is being filtered
+      let matchesSpecific = false;
+      if (specificSubject === '') {
+        matchesSpecific = true; // No filter
+      } else if (subjectCategory === 'languages' && level) {
+        // For languages with level, match the combined string
+        const expectedSubject = `${specificSubject} Level ${level}`;
+        matchesSpecific = slotData.subject === expectedSubject;
+      } else {
+        // For non-language or no level specified, match just the subject
+        matchesSpecific = slotData.subject === specificSubject || slotData.subject?.startsWith(specificSubject);
+      }
+      
       const matchesDate = !date || slotData.date === date;
-      if (matchesSubject && matchesDate) {
+      
+      if (matchesCategory && matchesSpecific && matchesDate) {
         tutorIds.add(slotData.tutorId);
       }
     });
+    
     // Fetch all tutor profiles
     const tutorProfiles = {};
     await Promise.all(Array.from(tutorIds).map(async (uid) => {
@@ -1187,12 +1375,28 @@ async function loadAvailableSlots() {
         tutorProfiles[uid] = userDoc.exists() ? userDoc.data() : {};
       } catch { tutorProfiles[uid] = {}; }
     }));
+    
     // Render cards
     slotsSnapshot.forEach(doc => {
       const slotData = doc.data();
-      const matchesSubject = subjectCategory === '' || slotData.subjectCategory === subjectCategory;
+      const matchesCategory = subjectCategory === '' || slotData.subjectCategory === subjectCategory;
+      
+      // For specific subject matching, check if level is being filtered
+      let matchesSpecific = false;
+      if (specificSubject === '') {
+        matchesSpecific = true; // No filter
+      } else if (subjectCategory === 'languages' && level) {
+        // For languages with level, match the combined string
+        const expectedSubject = `${specificSubject} Level ${level}`;
+        matchesSpecific = slotData.subject === expectedSubject;
+      } else {
+        // For non-language or no level specified, match just the subject
+        matchesSpecific = slotData.subject === specificSubject || slotData.subject?.startsWith(specificSubject);
+      }
+      
       const matchesDate = !date || slotData.date === date;
-      if (matchesSubject && matchesDate) {
+      
+      if (matchesCategory && matchesSpecific && matchesDate) {
         found = true;
         const card = document.createElement('div');
         card.className = 'available-slot-card';
@@ -1235,18 +1439,65 @@ async function loadAvailableSlots() {
 }
 async function cleanupExpiredSlots() {
   const { min } = getMinMaxDates();
+  const now = new Date();
   
   try {
-    const expiredQuery = query(
-      collection(db, 'slots'),
-      where('date', '<', min.toISOString().split('T')[0])
-    );
+    // Get all slots from both collections that might need cleanup
+    const allSlotsQuery = query(collection(db, 'slots'));
+    const allBookedSlotsQuery = query(collection(db, 'bookedSlots'));
     
-    const expiredSlots = await getDocs(expiredQuery);
+    const [allSlots, allBookedSlots] = await Promise.all([
+      getDocs(allSlotsQuery),
+      getDocs(allBookedSlotsQuery)
+    ]);
     
-    expiredSlots.forEach(async (doc) => {
-      await deleteDoc(doc.ref);
+    const slotsToDelete = [];
+    
+    // Check regular slots
+    allSlots.forEach((doc) => {
+      const slotData = doc.data();
+      const slotDate = slotData.date;
+      const slotStartTime = slotData.startTime;
+      
+      // Create a Date object for the slot's start time
+      const slotDateTime = new Date(`${slotDate}T${slotStartTime}`);
+      
+      // Delete if:
+      // 1. Slot date is before minimum allowed date (2 days from now), OR
+      // 2. Slot date/time has already passed
+      const shouldDelete = slotDate < min.toISOString().split('T')[0] || slotDateTime <= now;
+      
+      if (shouldDelete) {
+        slotsToDelete.push(doc.ref);
+      }
     });
+    
+    // Check booked slots
+    allBookedSlots.forEach((doc) => {
+      const slotData = doc.data();
+      const slotDate = slotData.date;
+      const slotStartTime = slotData.startTime;
+      
+      // Create a Date object for the slot's start time
+      const slotDateTime = new Date(`${slotDate}T${slotStartTime}`);
+      
+      // Delete if:
+      // 1. Slot date is before minimum allowed date (2 days from now), OR
+      // 2. Slot date/time has already passed
+      const shouldDelete = slotDate < min.toISOString().split('T')[0] || slotDateTime <= now;
+      
+      if (shouldDelete) {
+        slotsToDelete.push(doc.ref);
+      }
+    });
+    
+    // Delete all expired/past slots from both collections
+    await Promise.all(slotsToDelete.map(docRef => deleteDoc(docRef)));
+    
+    if (slotsToDelete.length > 0) {
+      console.log(`Cleaned up ${slotsToDelete.length} expired/past slots from both collections`);
+    }
+    
   } catch (error) {
     console.error('Error cleaning up expired slots:', error);
   }
@@ -1257,6 +1508,8 @@ setInterval(cleanupExpiredSlots, 1000 * 60 * 60 * 12); // Run every hour
 document.addEventListener('DOMContentLoaded', () => {
   cleanupExpiredSlots();
   setupBookingModal();
+  // Initialize Google Sheets headers if configured
+  initializeGoogleSheetsHeaders();
 });
 
 // --- Booking Modal Logic ---
@@ -1332,6 +1585,12 @@ async function openBookingModal(slotId) {
   }
   const slot = slotDoc.data();
   
+  // ADD THIS CHECK: Prevent booking your own slots
+  if (auth.currentUser && slot.tutorId === auth.currentUser.uid) {
+    alert("You can't book your own tutoring slot!");
+    return;
+  }
+  
   // Show slot info (no profile pic for now)
   infoDiv.innerHTML = `
     <strong>${slot.tutorName}</strong><br>
@@ -1372,35 +1631,59 @@ async function openBookingModal(slotId) {
   `;
   form.onsubmit = async (e) => {
     e.preventDefault();
-    if (!auth.currentUser) {
-      alert('Please sign in to book slots');
-      return;
+    
+    // ADD THIS AT THE START:
+    const submitButton = e.target.querySelector('button[type="submit"]');
+    if (submitButton.disabled) {
+      return; // Already submitting
     }
-    // Prevent double booking
-    if (slot.bookedBy || slot.studentUid) {
-      alert('This slot is already booked.');
-      modal.style.display = 'none';
-      return;
-    }
+    
+    // Disable button and show loading state
+    submitButton.disabled = true;
+    const originalButtonText = submitButton.textContent;
+    submitButton.textContent = 'Booking...';
+    
     try {
+      if (!auth.currentUser) {
+        alert('Please sign in to book slots');
+        return;
+      }
+      // Prevent double booking
+      if (slot.bookedBy || slot.studentUid) {
+        alert('This slot is already booked.');
+        modal.style.display = 'none';
+        return;
+      }
+      
+      // Get student name from user profile
+      const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+      const userData = userDoc.exists() ? userDoc.data() : {};
+      const studentName = userData.firstName && userData.lastName 
+        ? `${userData.firstName} ${userData.lastName}` 
+        : auth.currentUser.displayName || 'Unknown Student';
+
       // Create booked slot record
-      await addDoc(collection(db, 'bookedSlots'), {
+      const bookedSlotData = {
         ...slot,
         studentUid: auth.currentUser.uid,
-        studentName: auth.currentUser.displayName || '',
+        studentName: studentName,
+        studentEmail: auth.currentUser.email || '',
+        tutorEmail: slot.tutorEmail || '',
         bookedAt: new Date().toISOString(),
         originalCreatedAt: slot.createdAt
-      });
-      
-      // Delete the original slot
+      };
+
+      await addDoc(collection(db, 'bookedSlots'), bookedSlotData);
       await deleteDoc(doc(db, 'slots', slotId));
+
+      // Write booking to Google Sheets
+      await writeBookingToGoogleSheets(bookedSlotData);
       
       infoDiv.innerHTML = `<div style='color:var(--primary);font-size:1.1em;font-weight:600;text-align:center;margin:1em 0;'>Slot booked successfully!</div>`;
       form.innerHTML = '';
       setTimeout(() => { 
         modal.style.display = 'none'; 
         loadAvailableSlots(); 
-        // Refresh My Slots panel if it's open
         if (mySlotsPanel && mySlotsPanel.classList.contains('open')) {
           loadMySlotsData();
         }
@@ -1408,6 +1691,11 @@ async function openBookingModal(slotId) {
     } catch (err) {
       console.error('Booking error:', err);
       infoDiv.innerHTML = `<div style='color:#c00;font-size:1em;text-align:center;margin:1em 0;'>Error booking slot. Please try again.</div>`;
+    } finally {
+      // ADD THIS FINALLY BLOCK:
+      // Re-enable button
+      submitButton.disabled = false;
+      submitButton.textContent = originalButtonText;
     }
   };
   modal.style.display = 'flex';
@@ -1584,6 +1872,7 @@ document.getElementById('save-tutor-settings')?.addEventListener('click', async 
     alert('Error saving settings. Please try again.');
   }
 });
+
 
 // Sign-In / Sign-Out handler
 signBtn.addEventListener('click', () => {
