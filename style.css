@@ -1243,6 +1243,24 @@ form:disabled {
   transform: translateY(-1px);
 }
 
+.tutor-section {
+  max-width: 600px;
+  margin: auto;
+  padding: 1em;
+}
+.subject-filters select {
+  width: 100%;
+  margin-bottom: 0.5em;
+}
+@media (max-width: 600px) {
+  .tutor-section {
+    padding: 0.5em;
+  }
+  h2 {
+    font-size: 1.2em;
+    padding: 0.5em;
+  }
+}
 /* Mobile responsive design */
 @media (max-width: 768px) {
   .top-bar {
