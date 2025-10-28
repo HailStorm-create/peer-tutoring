@@ -13,12 +13,17 @@
       <select id="role-select">
         <option value="tutor">Tutor View</option>
         <option value="student">Student View</option>
+        <option value="events">Events</option>
       </select>
     </div>
     <div class="center-group">
       <button id="my-slots-btn" style="display: none;" aria-label="Open My Slots panel">
         <span class="my-slots-icon">📅</span>
         My Slots
+      </button>
+      <button id="my-stats-btn" style="display: none;" aria-label="Open My Stats panel">
+        <span class="my-stats-icon">📊</span>
+        My Stats
       </button>
     </div>
     <div class="right-group">
@@ -140,6 +145,181 @@
       </div>
       <div id="slots-list"></div>
     </section>
+
+    <!-- Admin Panel Section -->
+    <section class="admin-section" style="display: none;" id="admin-section">
+      <div class="admin-header">
+        <h1>📊 Administrator Dashboard</h1>
+        <p class="admin-subtitle">Comprehensive analytics of peer tutoring sessions</p>
+      </div>
+
+      <div class="admin-controls">
+        <div class="view-selector">
+          <button class="view-btn active" data-view="monthly" id="monthly-view-btn">Monthly</button>
+          <button class="view-btn" data-view="weekly" id="weekly-view-btn">Weekly</button>
+          <button class="view-btn" data-view="yearly" id="yearly-view-btn">Yearly</button>
+        </div>
+        
+        <div class="period-navigation">
+          <button id="prev-period" class="nav-btn">◀</button>
+          <span id="current-period" class="period-display">October 2025</span>
+          <button id="next-period" class="nav-btn">▶</button>
+        </div>
+      </div>
+
+      <div class="admin-stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">📚</div>
+          <div class="stat-content">
+            <div class="stat-value" id="total-sessions">0</div>
+            <div class="stat-label">Total Sessions</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">👥</div>
+          <div class="stat-content">
+            <div class="stat-value" id="unique-students">0</div>
+            <div class="stat-label">Unique Students</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">👨‍🏫</div>
+          <div class="stat-content">
+            <div class="stat-value" id="unique-tutors">0</div>
+            <div class="stat-label">Active Tutors</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">⏱️</div>
+          <div class="stat-content">
+            <div class="stat-value" id="total-hours">0</div>
+            <div class="stat-label">Total Hours</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-charts">
+        <div class="chart-container">
+          <h3>Sessions by Subject</h3>
+          <div id="subject-chart" class="chart"></div>
+        </div>
+        
+        <div class="chart-container">
+          <h3>Sessions Over Time</h3>
+          <div id="timeline-chart" class="chart"></div>
+        </div>
+      </div>
+
+      <div class="admin-tables">
+        <div class="table-container">
+          <h3>Top Subjects</h3>
+          <div id="top-subjects-table"></div>
+        </div>
+        
+        <div class="table-container">
+          <h3>Recent Sessions</h3>
+          <div id="recent-sessions-table"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Events Section -->
+    <section class="events-section" style="display: none;" id="events-section">
+      <div class="events-header">
+        <h1>🎉 Upcoming Events</h1>
+        <p class="events-subtitle">Join peer tutoring events and activities</p>
+      </div>
+      
+      <!-- Event Coordinator Panel (only visible to coordinators) -->
+      <div id="event-coordinator-panel" style="display: none;">
+        <div class="coordinator-banner">
+          <span class="coordinator-icon">🎯</span>
+          <span>Event Coordinator Panel</span>
+        </div>
+        
+        <div class="create-event-form-container">
+          <h3>Create New Event</h3>
+          <form id="create-event-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="event-title">Event Title:</label>
+                <input type="text" id="event-title" required placeholder="e.g., Study Group Session">
+              </div>
+              <div class="form-group">
+                <label for="event-category">Category:</label>
+                <select id="event-category" required>
+                  <option value="">Select Category</option>
+                  <option value="study-group">Study Group</option>
+                  <option value="workshop">Workshop</option>
+                  <option value="social">Social Event</option>
+                  <option value="competition">Competition</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="event-description">Description:</label>
+              <textarea id="event-description" rows="3" required placeholder="Describe the event..."></textarea>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label for="event-date">Date:</label>
+                <input type="date" id="event-date" required>
+              </div>
+              <div class="form-group">
+                <label for="event-start-time">Start Time:</label>
+                <input type="time" id="event-start-time" required>
+              </div>
+              <div class="form-group">
+                <label for="event-end-time">End Time:</label>
+                <input type="time" id="event-end-time" required>
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label for="event-location">Location:</label>
+                <input type="text" id="event-location" required placeholder="e.g., Library Room 101">
+              </div>
+              <div class="form-group">
+                <label for="event-max-attendees">Max Attendees:</label>
+                <input type="number" id="event-max-attendees" min="1" placeholder="Leave empty for unlimited">
+              </div>
+            </div>
+            
+            <button type="submit" class="create-event-btn">Create Event</button>
+          </form>
+        </div>
+        
+        <div class="coordinator-events-list">
+          <h3>Your Created Events</h3>
+          <div id="coordinator-events-grid"></div>
+        </div>
+      </div>
+      
+      <!-- Events Grid (visible to all users) -->
+      <div class="events-filters">
+        <select id="event-filter-category">
+          <option value="">All Categories</option>
+          <option value="study-group">Study Group</option>
+          <option value="workshop">Workshop</option>
+          <option value="social">Social Event</option>
+          <option value="competition">Competition</option>
+          <option value="other">Other</option>
+        </select>
+        
+        <select id="event-filter-time">
+          <option value="upcoming">Upcoming Events</option>
+          <option value="today">Today</option>
+          <option value="this-week">This Week</option>
+          <option value="this-month">This Month</option>
+        </select>
+      </div>
+      
+      <div id="events-grid" class="events-grid"></div>
+    </section>
   </main>
 
   <!-- My Slots Side Panel -->
@@ -187,6 +367,68 @@
             <button class="empty-action-btn" onclick="document.getElementById('role-select').value='student'; document.getElementById('role-select').dispatchEvent(new Event('change'));">
               Browse Tutors
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- My Stats Side Panel -->
+  <div id="my-stats-panel" class="slots-panel" role="dialog" aria-labelledby="my-stats-title" aria-hidden="true">
+    <div class="slots-panel-overlay" aria-hidden="true"></div>
+    <div class="slots-panel-content">
+      <div class="slots-panel-header">
+        <h2 id="my-stats-title">My Tutoring Stats</h2>
+        <button id="close-stats-panel" class="close-panel-btn" aria-label="Close My Stats panel">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      
+      <div class="slots-panel-body">
+        <!-- Hours Overview Section -->
+        <div class="stats-section">
+          <h3 class="stats-section-title">
+            <span class="section-icon">⏱️</span>
+            Hours Overview
+          </h3>
+          <div class="stats-cards-grid">
+            <div class="stat-mini-card">
+              <div class="stat-mini-icon">✅</div>
+              <div class="stat-mini-value" id="completed-hours">0</div>
+              <div class="stat-mini-label">Completed Hours</div>
+            </div>
+            <div class="stat-mini-card">
+              <div class="stat-mini-icon">📅</div>
+              <div class="stat-mini-value" id="planned-hours">0</div>
+              <div class="stat-mini-label">Upcoming Hours</div>
+            </div>
+            <div class="stat-mini-card">
+              <div class="stat-mini-icon">📊</div>
+              <div class="stat-mini-value" id="total-hours-stat">0</div>
+              <div class="stat-mini-label">Total Hours</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subject Breakdown by Category -->
+        <div class="stats-section">
+          <h3 class="stats-section-title">
+            <span class="section-icon">📚</span>
+            Hours by Subject Category
+          </h3>
+          <div id="category-breakdown" class="subject-breakdown">
+            <div class="stats-loading">Loading subject data...</div>
+          </div>
+        </div>
+
+        <!-- Subject Breakdown by Specific Course -->
+        <div class="stats-section">
+          <h3 class="stats-section-title">
+            <span class="section-icon">📖</span>
+            Hours by Specific Course
+          </h3>
+          <div id="course-breakdown" class="subject-breakdown">
+            <div class="stats-loading">Loading course data...</div>
           </div>
         </div>
       </div>
