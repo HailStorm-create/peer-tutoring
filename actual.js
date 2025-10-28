@@ -76,9 +76,190 @@ document.addEventListener('keydown', (e) => {
       closeSlotsPanel();
     }
   }
+  if (myStatsPanel && myStatsPanel.classList.contains('open')) {
+    if (e.key === 'Escape') {
+      closeStatsPanel();
+    }
+  }
 });
 
-// Function to load all slots data for the panel
+// --- My Stats Panel Functionality ---
+const myStatsBtn = document.getElementById('my-stats-btn');
+const myStatsPanel = document.getElementById('my-stats-panel');
+const closeStatsPanelBtn = document.getElementById('close-stats-panel');
+const statsOverlay = document.querySelectorAll('.slots-panel-overlay')[1]; // Second overlay for stats panel
+
+// Panel open/close functionality
+function openStatsPanel() {
+  myStatsPanel.classList.add('open');
+  myStatsPanel.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden'; // Prevent background scrolling
+  
+  // Focus management
+  closeStatsPanelBtn.focus();
+  
+  // Load stats data
+  loadMyStatsData();
+}
+
+function closeStatsPanel() {
+  myStatsPanel.classList.remove('open');
+  myStatsPanel.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = ''; // Restore scrolling
+  
+  // Return focus to the button that opened the panel
+  myStatsBtn.focus();
+}
+
+// Event listeners for stats panel
+if (myStatsBtn) {
+  myStatsBtn.addEventListener('click', openStatsPanel);
+}
+
+if (closeStatsPanelBtn) {
+  closeStatsPanelBtn.addEventListener('click', closeStatsPanel);
+}
+
+if (statsOverlay) {
+  statsOverlay.addEventListener('click', closeStatsPanel);
+}
+
+// Function to calculate time difference in hours
+function calculateHours(startTime, endTime) {
+  const [startHour, startMin] = startTime.split(':').map(Number);
+  const [endHour, endMin] = endTime.split(':').map(Number);
+  
+  const startMinutes = startHour * 60 + startMin;
+  const endMinutes = endHour * 60 + endMin;
+  
+  return (endMinutes - startMinutes) / 60;
+}
+
+// Function to load all stats data for the panel
+async function loadMyStatsData() {
+  if (!auth.currentUser) {
+    return;
+  }
+
+  try {
+    let completedHours = 0;
+    let plannedHours = 0;
+    const categoryHours = {}; // For subject categories
+    const courseHours = {};   // For specific courses
+    
+    const now = new Date();
+
+    // Fetch booked slots where user is the tutor
+    const bookedSlotsRef = collection(db, 'bookedSlots');
+    const bookedQuery = query(bookedSlotsRef, where('tutorId', '==', auth.currentUser.uid));
+    const bookedSnapshot = await getDocs(bookedQuery);
+    
+    bookedSnapshot.forEach((doc) => {
+      const slotData = doc.data();
+      if (slotData.cancelled) return; // Skip cancelled slots
+      
+      const slotDateTime = new Date(`${slotData.date}T${slotData.startTime}`);
+      const hours = calculateHours(slotData.startTime, slotData.endTime);
+      
+      if (slotDateTime < now) {
+        // Completed session
+        completedHours += hours;
+        
+        // Add to category breakdown
+        const category = slotData.subjectCategory || 'Other';
+        categoryHours[category] = (categoryHours[category] || 0) + hours;
+        
+        // Add to course breakdown
+        const course = slotData.specificSubject || slotData.subject || 'Unknown';
+        courseHours[course] = (courseHours[course] || 0) + hours;
+      } else {
+        // Upcoming session
+        plannedHours += hours;
+        
+        // Also count planned hours in breakdowns
+        const category = slotData.subjectCategory || 'Other';
+        if (!categoryHours[category]) categoryHours[category] = 0;
+        
+        const course = slotData.specificSubject || slotData.subject || 'Unknown';
+        if (!courseHours[course]) courseHours[course] = 0;
+      }
+    });
+
+    // Fetch available slots (not yet booked)
+    const slotsRef = collection(db, 'slots');
+    const slotsQuery = query(slotsRef, where('tutorId', '==', auth.currentUser.uid));
+    const slotsSnapshot = await getDocs(slotsQuery);
+    
+    slotsSnapshot.forEach((doc) => {
+      const slotData = doc.data();
+      const slotDateTime = new Date(`${slotData.date}T${slotData.startTime}`);
+      
+      if (slotDateTime >= now) {
+        // Future available slot
+        const hours = calculateHours(slotData.startTime, slotData.endTime);
+        plannedHours += hours;
+        
+        // Initialize in breakdowns (but don't add hours yet, these are just available)
+        const category = slotData.subjectCategory || 'Other';
+        if (!categoryHours[category]) categoryHours[category] = 0;
+        
+        const course = slotData.specificSubject || slotData.subject || 'Unknown';
+        if (!courseHours[course]) courseHours[course] = 0;
+      }
+    });
+
+    // Update the UI
+    document.getElementById('completed-hours').textContent = completedHours.toFixed(1);
+    document.getElementById('planned-hours').textContent = plannedHours.toFixed(1);
+    document.getElementById('total-hours-stat').textContent = (completedHours + plannedHours).toFixed(1);
+    
+    // Render subject category breakdown
+    renderSubjectBreakdown('category-breakdown', categoryHours);
+    
+    // Render specific course breakdown
+    renderSubjectBreakdown('course-breakdown', courseHours);
+    
+  } catch (error) {
+    console.error('Error loading stats:', error);
+    document.getElementById('category-breakdown').innerHTML = '<div class="stats-empty">Error loading statistics</div>';
+    document.getElementById('course-breakdown').innerHTML = '<div class="stats-empty">Error loading statistics</div>';
+  }
+}
+
+// Function to render subject breakdown (works for both categories and courses)
+function renderSubjectBreakdown(containerId, hoursData) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  
+  const entries = Object.entries(hoursData);
+  
+  if (entries.length === 0) {
+    container.innerHTML = `
+      <div class="stats-empty">
+        <div class="stats-empty-icon">📚</div>
+        <p>No tutoring data yet</p>
+      </div>
+    `;
+    return;
+  }
+  
+  // Sort by hours (descending)
+  entries.sort((a, b) => b[1] - a[1]);
+  
+  container.innerHTML = entries.map(([subject, hours]) => `
+    <div class="subject-stat-item">
+      <div class="subject-stat-name">${subject}</div>
+      <div class="subject-stat-hours">
+        <div class="subject-stat-value">
+          <div class="subject-stat-number">${hours.toFixed(1)}</div>
+          <div class="subject-stat-label">Hours</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// Keyboard navigation// Function to load all slots data for the panel
 async function loadMySlotsData() {
   if (!auth.currentUser) {
     console.log('No user signed in');
@@ -351,6 +532,747 @@ function showSlotDetailsModal(slotData, userRole) {
 window.viewSlotDetails = viewSlotDetails;
 window.showComingSoon = showComingSoon;
 
+// --- Events System ---
+const eventsSection = document.getElementById('events-section');
+const eventCoordinatorPanel = document.getElementById('event-coordinator-panel');
+const createEventForm = document.getElementById('create-event-form');
+const eventsGrid = document.getElementById('events-grid');
+const coordinatorEventsGrid = document.getElementById('coordinator-events-grid');
+const eventFilterCategory = document.getElementById('event-filter-category');
+const eventFilterTime = document.getElementById('event-filter-time');
+
+// Function to create an event
+async function createEvent(eventData) {
+  try {
+    const eventsRef = collection(db, 'events');
+    const docRef = await addDoc(eventsRef, {
+      ...eventData,
+      createdAt: Timestamp.now(),
+      createdBy: auth.currentUser.uid,
+      creatorEmail: auth.currentUser.email,
+      creatorName: `${eventData.creatorFirstName} ${eventData.creatorLastName}`,
+      attendees: [],
+      cancelled: false
+    });
+    
+    console.log('Event created with ID:', docRef.id);
+    return docRef.id;
+  } catch (error) {
+    console.error('Error creating event:', error);
+    throw error;
+  }
+}
+
+// Function to load events
+async function loadEvents(categoryFilter = '', timeFilter = 'upcoming') {
+  if (!eventsGrid) return;
+  
+  eventsGrid.innerHTML = '<div class="slots-loading">Loading events...</div>';
+  
+  try {
+    const eventsRef = collection(db, 'events');
+    let q = query(eventsRef, where('cancelled', '==', false));
+    
+    if (categoryFilter) {
+      q = query(eventsRef, where('cancelled', '==', false), where('category', '==', categoryFilter));
+    }
+    
+    const snapshot = await getDocs(q);
+    let events = [];
+    
+    snapshot.forEach((doc) => {
+      events.push({ id: doc.id, ...doc.data() });
+    });
+    
+    // Filter by time
+    const now = new Date();
+    events = events.filter(event => {
+      const eventDateTime = new Date(`${event.date}T${event.startTime}`);
+      
+      if (timeFilter === 'upcoming') {
+        return eventDateTime >= now;
+      } else if (timeFilter === 'today') {
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return eventDateTime >= today && eventDateTime < tomorrow;
+      } else if (timeFilter === 'this-week') {
+        const weekFromNow = new Date(now);
+        weekFromNow.setDate(weekFromNow.getDate() + 7);
+        return eventDateTime >= now && eventDateTime <= weekFromNow;
+      } else if (timeFilter === 'this-month') {
+        const monthFromNow = new Date(now);
+        monthFromNow.setMonth(monthFromNow.getMonth() + 1);
+        return eventDateTime >= now && eventDateTime <= monthFromNow;
+      }
+      return true;
+    });
+    
+    // Sort by date
+    events.sort((a, b) => {
+      const dateA = new Date(`${a.date}T${a.startTime}`);
+      const dateB = new Date(`${b.date}T${b.startTime}`);
+      return dateA - dateB;
+    });
+    
+    if (events.length === 0) {
+      eventsGrid.innerHTML = `
+        <div class="no-events-message">
+          <div class="no-events-icon">📅</div>
+          <h3>No events found</h3>
+          <p>Check back later for upcoming events!</p>
+        </div>
+      `;
+      return;
+    }
+    
+    eventsGrid.innerHTML = events.map(event => createEventCard(event)).join('');
+    
+  } catch (error) {
+    console.error('Error loading events:', error);
+    eventsGrid.innerHTML = '<div class="error">Error loading events. Please try again.</div>';
+  }
+}
+
+// Function to load coordinator's events
+async function loadCoordinatorEvents() {
+  if (!coordinatorEventsGrid || !auth.currentUser) return;
+  
+  coordinatorEventsGrid.innerHTML = '<div class="slots-loading">Loading your events...</div>';
+  
+  try {
+    const eventsRef = collection(db, 'events');
+    const q = query(eventsRef, where('createdBy', '==', auth.currentUser.uid));
+    
+    const snapshot = await getDocs(q);
+    let events = [];
+    
+    snapshot.forEach((doc) => {
+      events.push({ id: doc.id, ...doc.data() });
+    });
+    
+    // Sort by date
+    events.sort((a, b) => {
+      const dateA = new Date(`${a.date}T${a.startTime}`);
+      const dateB = new Date(`${b.date}T${b.startTime}`);
+      return dateA - dateB;
+    });
+    
+    if (events.length === 0) {
+      coordinatorEventsGrid.innerHTML = `
+        <div class="no-events-message">
+          <div class="no-events-icon">🎯</div>
+          <h3>You haven't created any events yet</h3>
+          <p>Use the form above to create your first event!</p>
+        </div>
+      `;
+      return;
+    }
+    
+    coordinatorEventsGrid.innerHTML = events.map(event => createEventCard(event, true)).join('');
+    
+  } catch (error) {
+    console.error('Error loading coordinator events:', error);
+    coordinatorEventsGrid.innerHTML = '<div class="error">Error loading events. Please try again.</div>';
+  }
+}
+
+// Function to create event card HTML
+function createEventCard(event, isCoordinator = false) {
+  const isUserRegistered = auth.currentUser && event.attendees?.includes(auth.currentUser.uid);
+  const isFull = event.maxAttendees && event.attendees?.length >= event.maxAttendees;
+  const eventDateTime = new Date(`${event.date}T${event.startTime}`);
+  const isPast = eventDateTime < new Date();
+  
+  let actionButtons = '';
+  
+  if (isCoordinator) {
+    actionButtons = `
+      <button class="event-btn delete-event-btn" onclick="deleteEvent('${event.id}')">Delete Event</button>
+    `;
+  } else if (isPast) {
+    actionButtons = '<div class="event-full-badge">Event Ended</div>';
+  } else if (isUserRegistered) {
+    actionButtons = `
+      <div class="event-registered-badge">
+        <span>✓</span> You're registered
+      </div>
+      <button class="event-btn cancel-rsvp-btn" onclick="cancelRSVP('${event.id}')">Cancel RSVP</button>
+    `;
+  } else if (isFull) {
+    actionButtons = '<div class="event-full-badge">Event Full</div>';
+  } else {
+    actionButtons = `
+      <button class="event-btn rsvp-btn" onclick="rsvpToEvent('${event.id}')">RSVP</button>
+    `;
+  }
+  
+  return `
+    <div class="event-card">
+      <div class="event-category-badge category-${event.category}">${event.category.replace('-', ' ')}</div>
+      <h3>${event.title}</h3>
+      <p class="event-description">${event.description}</p>
+      
+      <div class="event-details">
+        <div class="event-detail-item">
+          <span class="event-detail-icon">📅</span>
+          <span>${formatDate(event.date)}</span>
+        </div>
+        <div class="event-detail-item">
+          <span class="event-detail-icon">⏰</span>
+          <span>${formatTimeDisplay(event.startTime)} - ${formatTimeDisplay(event.endTime)}</span>
+        </div>
+        <div class="event-detail-item">
+          <span class="event-detail-icon">📍</span>
+          <span>${event.location}</span>
+        </div>
+        <div class="event-detail-item">
+          <span class="event-detail-icon">👤</span>
+          <span>Organized by ${event.creatorName}</span>
+        </div>
+      </div>
+      
+      <div class="event-attendee-info">
+        <span class="attendee-count">${event.attendees?.length || 0}</span>
+        <span>${event.maxAttendees ? `/ ${event.maxAttendees}` : ''} ${event.attendees?.length === 1 ? 'person' : 'people'} registered</span>
+      </div>
+      
+      <div class="event-actions">
+        ${actionButtons}
+      </div>
+    </div>
+  `;
+}
+
+// Function to RSVP to an event
+async function rsvpToEvent(eventId) {
+  if (!auth.currentUser) {
+    alert('Please sign in to RSVP to events');
+    return;
+  }
+  
+  try {
+    const eventRef = doc(db, 'events', eventId);
+    const eventDoc = await getDoc(eventRef);
+    
+    if (!eventDoc.exists()) {
+      alert('Event not found');
+      return;
+    }
+    
+    const eventData = eventDoc.data();
+    const attendees = eventData.attendees || [];
+    
+    // Check if already registered
+    if (attendees.includes(auth.currentUser.uid)) {
+      alert('You are already registered for this event');
+      return;
+    }
+    
+    // Check if event is full
+    if (eventData.maxAttendees && attendees.length >= eventData.maxAttendees) {
+      alert('Sorry, this event is full');
+      return;
+    }
+    
+    // Add user to attendees
+    attendees.push(auth.currentUser.uid);
+    await setDoc(eventRef, { attendees }, { merge: true });
+    
+    alert('Successfully registered for the event!');
+    loadEvents(eventFilterCategory?.value || '', eventFilterTime?.value || 'upcoming');
+    
+  } catch (error) {
+    console.error('Error RSVPing to event:', error);
+    alert('Failed to RSVP. Please try again.');
+  }
+}
+
+// Function to cancel RSVP
+async function cancelRSVP(eventId) {
+  if (!auth.currentUser) return;
+  
+  if (!confirm('Are you sure you want to cancel your RSVP?')) return;
+  
+  try {
+    const eventRef = doc(db, 'events', eventId);
+    const eventDoc = await getDoc(eventRef);
+    
+    if (!eventDoc.exists()) {
+      alert('Event not found');
+      return;
+    }
+    
+    const eventData = eventDoc.data();
+    const attendees = eventData.attendees || [];
+    
+    // Remove user from attendees
+    const updatedAttendees = attendees.filter(uid => uid !== auth.currentUser.uid);
+    await setDoc(eventRef, { attendees: updatedAttendees }, { merge: true });
+    
+    alert('RSVP cancelled');
+    loadEvents(eventFilterCategory?.value || '', eventFilterTime?.value || 'upcoming');
+    
+  } catch (error) {
+    console.error('Error cancelling RSVP:', error);
+    alert('Failed to cancel RSVP. Please try again.');
+  }
+}
+
+// Function to delete event
+async function deleteEvent(eventId) {
+  if (!confirm('Are you sure you want to delete this event? This cannot be undone.')) return;
+  
+  try {
+    await deleteDoc(doc(db, 'events', eventId));
+    alert('Event deleted successfully');
+    loadCoordinatorEvents();
+    loadEvents(eventFilterCategory?.value || '', eventFilterTime?.value || 'upcoming');
+  } catch (error) {
+    console.error('Error deleting event:', error);
+    alert('Failed to delete event. Please try again.');
+  }
+}
+
+// Event form submission
+if (createEventForm) {
+  createEventForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    if (!auth.currentUser) {
+      alert('Please sign in to create events');
+      return;
+    }
+    
+    // Get user profile for creator name
+    const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+    const userData = userDoc.data() || {};
+    
+    const eventData = {
+      title: document.getElementById('event-title').value.trim(),
+      category: document.getElementById('event-category').value,
+      description: document.getElementById('event-description').value.trim(),
+      date: document.getElementById('event-date').value,
+      startTime: document.getElementById('event-start-time').value,
+      endTime: document.getElementById('event-end-time').value,
+      location: document.getElementById('event-location').value.trim(),
+      maxAttendees: parseInt(document.getElementById('event-max-attendees').value) || null
+    };
+    
+    // Validate dates
+    const eventDateTime = new Date(`${eventData.date}T${eventData.startTime}`);
+    const now = new Date();
+    
+    if (eventDateTime < now) {
+      alert('Event date and time must be in the future');
+      return;
+    }
+    
+    // Validate times
+    if (eventData.startTime >= eventData.endTime) {
+      alert('End time must be after start time');
+      return;
+    }
+    
+    try {
+      // Debug: Log user info
+      console.log('Current user email:', auth.currentUser.email);
+      console.log('Current user UID:', auth.currentUser.uid);
+      console.log('Is event coordinator?', isEventCoordinator(auth.currentUser.email));
+      console.log('Is admin?', isAdmin(auth.currentUser.email));
+      
+      // Create event with proper creator name from Firestore user data
+      await addDoc(collection(db, 'events'), {
+        ...eventData,
+        createdAt: Timestamp.now(),
+        createdBy: auth.currentUser.uid,
+        creatorEmail: auth.currentUser.email,
+        creatorName: `${userData.firstName || 'Unknown'} ${userData.lastName || 'User'}`,
+        attendees: [],
+        cancelled: false
+      });
+      
+      alert('Event created successfully!');
+      createEventForm.reset();
+      loadCoordinatorEvents();
+      loadEvents(eventFilterCategory?.value || '', eventFilterTime?.value || 'upcoming');
+    } catch (error) {
+      console.error('Error creating event:', error);
+      console.error('Full error object:', error);
+      alert(`Failed to create event: ${error.message}\n\nCheck the browser console for more details.`);
+    }
+  });
+}
+
+// Event filters
+if (eventFilterCategory) {
+  eventFilterCategory.addEventListener('change', () => {
+    loadEvents(eventFilterCategory.value, eventFilterTime?.value || 'upcoming');
+  });
+}
+
+if (eventFilterTime) {
+  eventFilterTime.addEventListener('change', () => {
+    loadEvents(eventFilterCategory?.value || '', eventFilterTime.value);
+  });
+}
+
+// Make event functions globally accessible
+window.rsvpToEvent = rsvpToEvent;
+window.cancelRSVP = cancelRSVP;
+window.deleteEvent = deleteEvent;
+
+// Admin Panel Variables and Functions
+let currentAdminView = 'monthly';
+let currentAdminPeriod = new Date();
+
+// Function to load admin dashboard data
+async function loadAdminDashboard() {
+  if (!auth.currentUser || !isAdmin(auth.currentUser.email)) {
+    return;
+  }
+
+  try {
+    await updateAdminStats();
+    await updateAdminCharts();
+    await updateAdminTables();
+  } catch (error) {
+    console.error('Error loading admin dashboard:', error);
+  }
+}
+
+// Function to get date range based on current view and period
+function getDateRange() {
+  const start = new Date(currentAdminPeriod);
+  const end = new Date(currentAdminPeriod);
+  
+  if (currentAdminView === 'weekly') {
+    // Get start of week (Sunday)
+    start.setDate(start.getDate() - start.getDay());
+    start.setHours(0, 0, 0, 0);
+    // Get end of week (Saturday)
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+  } else if (currentAdminView === 'monthly') {
+    // Get start of month
+    start.setDate(1);
+    start.setHours(0, 0, 0, 0);
+    // Get end of month
+    end.setMonth(end.getMonth() + 1);
+    end.setDate(0);
+    end.setHours(23, 59, 59, 999);
+  } else if (currentAdminView === 'yearly') {
+    // Get start of year
+    start.setMonth(0, 1);
+    start.setHours(0, 0, 0, 0);
+    // Get end of year
+    end.setMonth(11, 31);
+    end.setHours(23, 59, 59, 999);
+  }
+  
+  return { start, end };
+}
+
+// Function to update period display
+function updatePeriodDisplay() {
+  const periodDisplay = document.getElementById('current-period');
+  if (!periodDisplay) return;
+  
+  if (currentAdminView === 'weekly') {
+    const { start, end } = getDateRange();
+    periodDisplay.textContent = `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  } else if (currentAdminView === 'monthly') {
+    periodDisplay.textContent = currentAdminPeriod.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  } else if (currentAdminView === 'yearly') {
+    periodDisplay.textContent = currentAdminPeriod.getFullYear().toString();
+  }
+}
+
+// Function to fetch sessions within date range
+async function fetchSessionsInRange() {
+  const { start, end } = getDateRange();
+  const bookedSlotsRef = collection(db, 'bookedSlots');
+  
+  try {
+    const snapshot = await getDocs(bookedSlotsRef);
+    const sessions = [];
+    
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      const sessionDate = new Date(`${data.date || data.day}T${data.startTime}`);
+      
+      if (sessionDate >= start && sessionDate <= end && !data.cancelled) {
+        sessions.push({
+          id: doc.id,
+          ...data,
+          sessionDate
+        });
+      }
+    });
+    
+    return sessions;
+  } catch (error) {
+    console.error('Error fetching sessions:', error);
+    return [];
+  }
+}
+
+// Function to update admin statistics
+async function updateAdminStats() {
+  const sessions = await fetchSessionsInRange();
+  
+  // Calculate total sessions
+  document.getElementById('total-sessions').textContent = sessions.length;
+  
+  // Calculate unique students
+  const uniqueStudents = new Set(sessions.map(s => s.studentEmail).filter(Boolean));
+  document.getElementById('unique-students').textContent = uniqueStudents.size;
+  
+  // Calculate unique tutors
+  const uniqueTutors = new Set(sessions.map(s => s.tutorEmail).filter(Boolean));
+  document.getElementById('unique-tutors').textContent = uniqueTutors.size;
+  
+  // Calculate total hours
+  let totalMinutes = 0;
+  sessions.forEach(session => {
+    const start = parseTime(session.startTime);
+    const end = parseTime(session.endTime);
+    if (start && end) {
+      totalMinutes += (end.hours * 60 + end.minutes) - (start.hours * 60 + start.minutes);
+    }
+  });
+  document.getElementById('total-hours').textContent = (totalMinutes / 60).toFixed(1);
+}
+
+// Function to update admin charts
+async function updateAdminCharts() {
+  const sessions = await fetchSessionsInRange();
+  
+  // Update subject chart
+  const subjectCounts = {};
+  sessions.forEach(session => {
+    const subject = session.subject || session.specificSubject || 'Unknown';
+    subjectCounts[subject] = (subjectCounts[subject] || 0) + 1;
+  });
+  
+  renderSubjectChart(subjectCounts);
+  renderTimelineChart(sessions);
+}
+
+// Function to render subject chart
+function renderSubjectChart(subjectCounts) {
+  const chartDiv = document.getElementById('subject-chart');
+  if (!chartDiv) return;
+  
+  const sortedSubjects = Object.entries(subjectCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+  
+  if (sortedSubjects.length === 0) {
+    chartDiv.innerHTML = '<div class="empty-data"><div class="empty-data-icon">📊</div><p>No data available for this period</p></div>';
+    return;
+  }
+  
+  const maxCount = Math.max(...sortedSubjects.map(([_, count]) => count));
+  
+  chartDiv.innerHTML = sortedSubjects.map(([subject, count]) => {
+    const percentage = (count / maxCount) * 100;
+    return `
+      <div class="chart-bar-container">
+        <div class="chart-label">${subject}</div>
+        <div class="chart-bar-wrapper">
+          <div class="chart-bar" style="width: ${percentage}%"></div>
+          <div class="chart-value">${count}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Function to render timeline chart
+function renderTimelineChart(sessions) {
+  const chartDiv = document.getElementById('timeline-chart');
+  if (!chartDiv) return;
+  
+  let timeData = {};
+  let labels = [];
+  
+  if (currentAdminView === 'weekly') {
+    // Group by day of week
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    days.forEach(day => timeData[day] = 0);
+    
+    sessions.forEach(session => {
+      const dayIndex = session.sessionDate.getDay();
+      timeData[days[dayIndex]]++;
+    });
+    labels = days;
+  } else if (currentAdminView === 'monthly') {
+    // Group by week
+    const { start, end } = getDateRange();
+    const weeks = Math.ceil((end.getDate()) / 7);
+    
+    for (let i = 1; i <= weeks; i++) {
+      timeData[`W${i}`] = 0;
+    }
+    
+    sessions.forEach(session => {
+      const weekNum = Math.ceil(session.sessionDate.getDate() / 7);
+      timeData[`W${weekNum}`]++;
+    });
+    labels = Object.keys(timeData);
+  } else if (currentAdminView === 'yearly') {
+    // Group by month
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    months.forEach(month => timeData[month] = 0);
+    
+    sessions.forEach(session => {
+      const monthIndex = session.sessionDate.getMonth();
+      timeData[months[monthIndex]]++;
+    });
+    labels = months;
+  }
+  
+  if (Object.values(timeData).every(v => v === 0)) {
+    chartDiv.innerHTML = '<div class="empty-data"><div class="empty-data-icon">📈</div><p>No sessions recorded for this period</p></div>';
+    return;
+  }
+  
+  const maxCount = Math.max(...Object.values(timeData), 1);
+  
+  chartDiv.innerHTML = `
+    <div class="timeline-chart">
+      ${labels.map(label => {
+        const count = timeData[label];
+        const heightPercentage = (count / maxCount) * 100;
+        return `<div class="timeline-bar" style="height: ${heightPercentage}%" title="${label}: ${count} sessions"></div>`;
+      }).join('')}
+    </div>
+    <div class="timeline-label">
+      ${labels.map(label => `<span>${label}</span>`).join('')}
+    </div>
+  `;
+}
+
+// Function to update admin tables
+async function updateAdminTables() {
+  const sessions = await fetchSessionsInRange();
+  
+  // Update top subjects table
+  const subjectCounts = {};
+  sessions.forEach(session => {
+    const subject = session.subject || session.specificSubject || 'Unknown';
+    subjectCounts[subject] = (subjectCounts[subject] || 0) + 1;
+  });
+  
+  const topSubjects = Object.entries(subjectCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+  
+  const topSubjectsDiv = document.getElementById('top-subjects-table');
+  if (topSubjectsDiv) {
+    if (topSubjects.length === 0) {
+      topSubjectsDiv.innerHTML = '<div class="empty-data"><p>No subjects data available</p></div>';
+    } else {
+      topSubjectsDiv.innerHTML = `
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Subject</th>
+              <th>Sessions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${topSubjects.map(([subject, count], index) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td><span class="subject-badge">${subject}</span></td>
+                <td>${count}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+  }
+  
+  // Update recent sessions table
+  const recentSessions = sessions
+    .sort((a, b) => b.sessionDate - a.sessionDate)
+    .slice(0, 10);
+  
+  const recentSessionsDiv = document.getElementById('recent-sessions-table');
+  if (recentSessionsDiv) {
+    if (recentSessions.length === 0) {
+      recentSessionsDiv.innerHTML = '<div class="empty-data"><p>No recent sessions</p></div>';
+    } else {
+      recentSessionsDiv.innerHTML = `
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Subject</th>
+              <th>Tutor</th>
+              <th>Student</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${recentSessions.map(session => `
+              <tr>
+                <td>${formatDate(session.date || session.day)}</td>
+                <td><span class="subject-badge">${session.subject || session.specificSubject || 'N/A'}</span></td>
+                <td>${session.tutorName || 'N/A'}</td>
+                <td>${session.studentName || 'N/A'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+  }
+}
+
+// Event listeners for admin panel
+document.addEventListener('DOMContentLoaded', () => {
+  // View selector buttons
+  document.querySelectorAll('.view-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentAdminView = btn.dataset.view;
+      document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentAdminPeriod = new Date(); // Reset to current period
+      updatePeriodDisplay();
+      loadAdminDashboard();
+    });
+  });
+  
+  // Period navigation
+  document.getElementById('prev-period')?.addEventListener('click', () => {
+    if (currentAdminView === 'weekly') {
+      currentAdminPeriod.setDate(currentAdminPeriod.getDate() - 7);
+    } else if (currentAdminView === 'monthly') {
+      currentAdminPeriod.setMonth(currentAdminPeriod.getMonth() - 1);
+    } else if (currentAdminView === 'yearly') {
+      currentAdminPeriod.setFullYear(currentAdminPeriod.getFullYear() - 1);
+    }
+    updatePeriodDisplay();
+    loadAdminDashboard();
+  });
+  
+  document.getElementById('next-period')?.addEventListener('click', () => {
+    if (currentAdminView === 'weekly') {
+      currentAdminPeriod.setDate(currentAdminPeriod.getDate() + 7);
+    } else if (currentAdminView === 'monthly') {
+      currentAdminPeriod.setMonth(currentAdminPeriod.getMonth() + 1);
+    } else if (currentAdminView === 'yearly') {
+      currentAdminPeriod.setFullYear(currentAdminPeriod.getFullYear() + 1);
+    }
+    updatePeriodDisplay();
+    loadAdminDashboard();
+  });
+});
+
 // Test function for Google Sheets (for debugging)
 window.testGoogleSheets = async function() {
   console.log('Testing Google Sheets configuration...');
@@ -392,6 +1314,29 @@ window.testGoogleSheets = async function() {
 const GOOGLE_SHEETS_CONFIG = {
   webAppUrl: 'https://script.google.com/macros/s/AKfycbz3vbMOOIYNTHHM9m1YCSyK9bMGHG8xGUbWOlexea7KSHM-NbbFch1NaULzHyiikTpL/exec' // Paste the URL from Apps Script deployment
 };
+
+// Admin Configuration
+const ADMIN_EMAILS = [
+  'adityavshah10@gmail.com'
+  // Add more admin emails here
+];
+
+// Event Coordinator Configuration
+const EVENT_COORDINATOR_EMAILS = [
+  'adityavshah1018work@gmail.com'
+  // Add more event coordinator emails here
+];
+
+// Function to check if user is admin
+function isAdmin(userEmail) {
+  return ADMIN_EMAILS.includes(userEmail?.toLowerCase());
+}
+
+// Function to check if user is event coordinator
+function isEventCoordinator(userEmail) {
+  return EVENT_COORDINATOR_EMAILS.includes(userEmail?.toLowerCase());
+}
+
 // Function to check if Google Sheets is properly configured
 function isGoogleSheetsConfigured() {
   return GOOGLE_SHEETS_CONFIG.apiKey && GOOGLE_SHEETS_CONFIG.apiKey.length > 10 && 
@@ -1093,16 +2038,32 @@ roleSelect.addEventListener('change', async (e) => {
   const role = e.target.value;
   bodyEl.classList.toggle('tutor-view', role === 'tutor');
   bodyEl.classList.toggle('student-view', role === 'student');
+  bodyEl.classList.toggle('events-view', role === 'events');
   currentRole.textContent = role[0].toUpperCase() + role.slice(1);
+  
+  // Hide all sections first
+  if (studentSection) studentSection.style.display = 'none';
+  if (tutorSection) tutorSection.style.display = 'none';
+  if (eventsSection) eventsSection.style.display = 'none';
   
   if (role === 'student' && auth.currentUser) {
     studentSection.style.display = 'block';
-    tutorSection.style.display = 'none';
     await loadTutorSlots();
+  } else if (role === 'events') {
+    eventsSection.style.display = 'block';
+    
+    // Show coordinator panel if user is event coordinator
+    if (auth.currentUser && isEventCoordinator(auth.currentUser.email)) {
+      eventCoordinatorPanel.style.display = 'block';
+      loadCoordinatorEvents();
+    } else {
+      eventCoordinatorPanel.style.display = 'none';
+    }
+    
+    loadEvents(eventFilterCategory?.value || '', eventFilterTime?.value || 'upcoming');
   } else {
-    studentSection.style.display = 'none';
     tutorSection.style.display = 'block';
-    await loadAvailableSlots(); // This will refresh available slots when switching to student view
+    await loadAvailableSlots();
   }
 });
 
@@ -1713,6 +2674,37 @@ onAuthStateChanged(auth, async user => {
   if (user) {
     const userDoc = await getDoc(doc(db, 'users', user.uid));
     
+    // Check if user is admin
+    const userIsAdmin = isAdmin(user.email);
+    
+    if (userIsAdmin) {
+      // Admin view: hide role selector, show only admin panel
+      roleSelect.style.display = 'none';
+      settingsBtn.style.display = 'none';
+      if (mySlotsBtn) mySlotsBtn.style.display = 'none';
+      if (myStatsBtn) myStatsBtn.style.display = 'none';
+      
+      // Hide tutor and student sections
+      if (studentSection) studentSection.style.display = 'none';
+      if (tutorSection) tutorSection.style.display = 'none';
+      if (eventsSection) eventsSection.style.display = 'none';
+      
+      // Show admin section
+      const adminSection = document.getElementById('admin-section');
+      if (adminSection) {
+        adminSection.style.display = 'block';
+        updatePeriodDisplay();
+        loadAdminDashboard();
+      }
+      
+      currentRole.textContent = 'Administrator';
+      signBtn.textContent = 'Sign Out';
+      profilePic.src = user.photoURL || 'avatar-placeholder.png';
+      
+      return;
+    }
+    
+    // Regular user flow
     if (!userDoc.exists()) {
       profileSetupModal.style.display = 'flex';
       settingsBtn.style.display = 'none';
@@ -1732,32 +2724,66 @@ onAuthStateChanged(auth, async user => {
       profilePic.src = user.photoURL || 'avatar-placeholder.png';
     }
     
-    // Show My Slots button when signed in
+    // Show My Slots and My Stats buttons when signed in
     if (mySlotsBtn) {
       mySlotsBtn.style.display = 'flex';
+    }
+    if (myStatsBtn) {
+      myStatsBtn.style.display = 'flex';
     }
     
     if (roleSelect.value === 'student') {
       studentSection.style.display = 'block';
       tutorSection.style.display = 'none';
+      eventsSection.style.display = 'none';
       await loadTutorSlots();
+    } else if (roleSelect.value === 'events') {
+      studentSection.style.display = 'none';
+      tutorSection.style.display = 'none';
+      eventsSection.style.display = 'block';
+      
+      // Show coordinator panel if user is event coordinator
+      if (isEventCoordinator(user.email)) {
+        eventCoordinatorPanel.style.display = 'block';
+        loadCoordinatorEvents();
+      } else {
+        eventCoordinatorPanel.style.display = 'none';
+      }
+      
+      loadEvents(eventFilterCategory?.value || '', eventFilterTime?.value || 'upcoming');
     } else {
       studentSection.style.display = 'none';
       tutorSection.style.display = 'block';
+      eventsSection.style.display = 'none';
       await loadAvailableSlots();
     }
   } else {
     signBtn.textContent = 'Sign In';
     profilePic.src = 'avatar-placeholder.png';
     settingsBtn.style.display = 'none';
-    studentSection.style.display = 'none';
-    tutorSection.style.display = 'block';
+    
+    // Handle view when not signed in
+    if (roleSelect.value === 'events') {
+      studentSection.style.display = 'none';
+      tutorSection.style.display = 'none';
+      eventsSection.style.display = 'block';
+      eventCoordinatorPanel.style.display = 'none';
+      loadEvents(eventFilterCategory?.value || '', eventFilterTime?.value || 'upcoming');
+    } else {
+      studentSection.style.display = 'none';
+      eventsSection.style.display = 'none';
+      tutorSection.style.display = 'block';
+    }
+    
     // Set just the role text when not signed in
     currentRole.textContent = roleSelect.value[0].toUpperCase() + roleSelect.value.slice(1);
     
-    // Hide My Slots button when not signed in
+    // Hide My Slots and My Stats buttons when not signed in
     if (mySlotsBtn) {
       mySlotsBtn.style.display = 'none';
+    }
+    if (myStatsBtn) {
+      myStatsBtn.style.display = 'none';
     }
   }
 });
