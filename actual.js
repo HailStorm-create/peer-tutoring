@@ -1528,10 +1528,13 @@ const languageLevelContainer = document.getElementById('language-level-container
 const languageLevel = document.getElementById('language-level');
 
 const availableSlots = document.getElementById('available-slots');
-const studentSubjectFilter = document.getElementById('student-subject-filter');
+const tutorSearchInput = document.getElementById('tutor-search-input');
+const searchSuggestions = document.getElementById('search-suggestions');
 
 // Make selectedCalendarDate global so all functions can access it
 let selectedCalendarDate = '';
+let currentSearchTerm = '';
+let highlightedSuggestion = -1;
 
 const profileSetupModal = document.getElementById('profile-setup-modal');
 const profileSetupForm = document.getElementById('profile-setup-form');
@@ -1620,21 +1623,7 @@ function createSubjectCheckboxes(containerId, selectedSubjects = [], namePrefix 
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Uncheck all help-needed checkboxes if never-student is checked
-  document.getElementById('never-student').addEventListener('change', function() {
-    if (this.checked) {
-      document.querySelectorAll('#help-needed-subjects input[type="checkbox"]').forEach(cb => { cb.checked = false; });
-    }
-  });
-  // Uncheck all tutoring checkboxes if never-tutor is checked
-  document.getElementById('never-tutor').addEventListener('change', function() {
-    if (this.checked) {
-      document.querySelectorAll('#tutoring-subjects input[type="checkbox"]').forEach(cb => { cb.checked = false; });
-    }
-  });
-  // Populate subject checkboxes in profile setup
-  createSubjectCheckboxes('help-needed-subjects', [], 'help-');
-  createSubjectCheckboxes('tutoring-subjects', [], 'tutor-');
+  // Subject checkboxes removed from profile setup
   
   // --- Custom Calendar for Slot Form ---
   const slotCalendarContainer = document.getElementById('custom-calendar-container');
@@ -1961,54 +1950,158 @@ buildingSelect.addEventListener('change', (e) => {
   });
 });
 
-// Student subject filter cascading dropdowns
-studentSubjectFilter.addEventListener('change', (e) => {
-  const specificSubjectContainer = document.getElementById('specific-subject-container');
-  const specificSubject = document.getElementById('specific-subject');
-  const languageLevelContainer = document.getElementById('language-level-container');
-  const languageLevel = document.getElementById('language-level');
-  
-  specificSubjectContainer.style.display = e.target.value ? 'block' : 'none';
-  specificSubject.innerHTML = '<option value="">Select Specific Course</option>';
-  languageLevelContainer.style.display = 'none';
-  languageLevel.innerHTML = '<option value="">Select Level</option>';
-  
-  if (e.target.value && subjectData[e.target.value]) {
-    subjectData[e.target.value].forEach(subject => {
-      const option = document.createElement('option');
-      option.value = subject;
-      option.textContent = subject;
-      specificSubject.appendChild(option);
-    });
-  }
-  loadAvailableSlots();
-});
-
-document.getElementById('specific-subject')?.addEventListener('change', (e) => {
-  const languageLevelContainer = document.getElementById('language-level-container');
-  const languageLevel = document.getElementById('language-level');
-  const subjectCategory = document.getElementById('student-subject-filter').value;
-  
-  // Only show level dropdown for languages
-  if (subjectCategory === 'languages' && e.target.value) {
-    languageLevelContainer.style.display = 'block';
-    languageLevel.innerHTML = '<option value="">Select Level</option>';
+// Search functionality for tutor subjects
+if (tutorSearchInput && searchSuggestions) {
+  // Generate all possible search options
+  function generateSearchOptions() {
+    const options = [];
     
-    const levels = ['1', '2', '3', '4', '5', 'AP'];
-    levels.forEach(level => {
-      const option = document.createElement('option');
-      option.value = level;
-      option.textContent = `Level ${level}`;
-      languageLevel.appendChild(option);
+    // Add categories
+    Object.keys(subjectData).forEach(category => {
+      options.push({
+        type: 'category',
+        text: category.charAt(0).toUpperCase() + category.slice(1),
+        value: category,
+        category: category
+      });
+      
+      // Add specific subjects
+      subjectData[category].forEach(subject => {
+        options.push({
+          type: 'subject',
+          text: subject,
+          value: subject,
+          category: category
+        });
+        
+        // Add language levels for language subjects
+        if (category === 'languages') {
+          const levels = ['1', '2', '3', '4', '5', 'AP'];
+          levels.forEach(level => {
+            options.push({
+              type: 'subject_with_level',
+              text: `${subject} Level ${level}`,
+              value: `${subject} Level ${level}`,
+              category: category,
+              subject: subject,
+              level: level
+            });
+          });
+        }
+      });
     });
-  } else {
-    languageLevelContainer.style.display = 'none';
-    languageLevel.innerHTML = '<option value="">Select Level</option>';
+    
+    return options;
   }
-  loadAvailableSlots();
-});
-
-document.getElementById('language-level')?.addEventListener('change', loadAvailableSlots);
+  
+  const searchOptions = generateSearchOptions();
+  
+  // Filter and display suggestions
+  function showSuggestions(query) {
+    if (!query.trim()) {
+      searchSuggestions.classList.remove('show');
+      highlightedSuggestion = -1;
+      return;
+    }
+    
+    const filtered = searchOptions.filter(option => 
+      option.text.toLowerCase().includes(query.toLowerCase())
+    ).slice(0, 8); // Limit to 8 suggestions
+    
+    if (filtered.length === 0) {
+      searchSuggestions.classList.remove('show');
+      return;
+    }
+    
+    searchSuggestions.innerHTML = filtered.map((option, index) => {
+      const highlightedText = option.text.replace(
+        new RegExp(`(${query})`, 'gi'),
+        '<span class="suggestion-match">$1</span>'
+      );
+      
+      return `
+        <div class="suggestion-item" data-index="${index}" data-value="${option.value}" data-type="${option.type}">
+          <span class="suggestion-category">${option.category}</span>
+          <span class="suggestion-text">${highlightedText}</span>
+        </div>
+      `;
+    }).join('');
+    
+    searchSuggestions.classList.add('show');
+    highlightedSuggestion = -1;
+  }
+  
+  // Handle input events
+  tutorSearchInput.addEventListener('input', (e) => {
+    currentSearchTerm = e.target.value;
+    showSuggestions(currentSearchTerm);
+  });
+  
+  // Handle keyboard navigation
+  tutorSearchInput.addEventListener('keydown', (e) => {
+    const suggestions = searchSuggestions.querySelectorAll('.suggestion-item');
+    
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      highlightedSuggestion = Math.min(highlightedSuggestion + 1, suggestions.length - 1);
+      updateHighlight(suggestions);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      highlightedSuggestion = Math.max(highlightedSuggestion - 1, -1);
+      updateHighlight(suggestions);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (highlightedSuggestion >= 0 && suggestions[highlightedSuggestion]) {
+        selectSuggestion(suggestions[highlightedSuggestion]);
+      } else {
+        // Search with current input value
+        loadAvailableSlots();
+        searchSuggestions.classList.remove('show');
+      }
+    } else if (e.key === 'Escape') {
+      searchSuggestions.classList.remove('show');
+      highlightedSuggestion = -1;
+    }
+  });
+  
+  // Handle suggestion clicks
+  searchSuggestions.addEventListener('click', (e) => {
+    const suggestionItem = e.target.closest('.suggestion-item');
+    if (suggestionItem) {
+      selectSuggestion(suggestionItem);
+    }
+  });
+  
+  // Select a suggestion
+  function selectSuggestion(suggestionElement) {
+    const value = suggestionElement.dataset.value;
+    tutorSearchInput.value = value;
+    currentSearchTerm = value;
+    searchSuggestions.classList.remove('show');
+    loadAvailableSlots();
+  }
+  
+  // Update visual highlight
+  function updateHighlight(suggestions) {
+    suggestions.forEach((item, index) => {
+      item.classList.toggle('highlighted', index === highlightedSuggestion);
+    });
+  }
+  
+  // Hide suggestions when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!tutorSearchInput.contains(e.target) && !searchSuggestions.contains(e.target)) {
+      searchSuggestions.classList.remove('show');
+    }
+  });
+  
+  // Show all suggestions when focusing the input
+  tutorSearchInput.addEventListener('focus', () => {
+    if (currentSearchTerm) {
+      showSuggestions(currentSearchTerm);
+    }
+  });
+}
 
 // Settings button functionality
 settingsBtn?.addEventListener('click', async () => {
@@ -2164,9 +2257,13 @@ slotForm.addEventListener('submit', async (e) => {
 
     // Reset form and reload slots
     slotForm.reset();
-    specificSubjectContainer.style.display = 'none';
-    languageLevelContainer.style.display = 'none';
-    buildingSelectContainer.style.display = 'none';
+    const formSpecificSubjectContainer = document.getElementById('form-specific-subject-container');
+    const formLanguageLevelContainer = document.getElementById('form-language-level-container');
+    const formBuildingSelectContainer = document.getElementById('building-select-container');
+    
+    if (formSpecificSubjectContainer) formSpecificSubjectContainer.style.display = 'none';
+    if (formLanguageLevelContainer) formLanguageLevelContainer.style.display = 'none';
+    if (formBuildingSelectContainer) formBuildingSelectContainer.style.display = 'none';
     await loadTutorSlots();
     
     // Refresh My Slots panel if it's open
@@ -2288,10 +2385,8 @@ async function loadAvailableSlots() {
     );
     const slotsSnapshot = await getDocs(slotsQuery);
     
-    // Filter by subject category, specific subject, level, and selected date
-    const subjectCategory = studentSubjectFilter.value;
-    const specificSubject = document.getElementById('specific-subject')?.value || '';
-    const level = document.getElementById('language-level')?.value || '';
+    // Filter by search term and selected date
+    const searchTerm = tutorSearchInput?.value?.toLowerCase() || '';
     const date = selectedCalendarDate;
     
     let found = false;
@@ -2305,25 +2400,15 @@ async function loadAvailableSlots() {
     const tutorIds = new Set();
     slotsSnapshot.forEach(doc => {
       const slotData = doc.data();
-      // Filter by subject category, specific subject, level, and date
-      const matchesCategory = subjectCategory === '' || slotData.subjectCategory === subjectCategory;
       
-      // For specific subject matching, check if level is being filtered
-      let matchesSpecific = false;
-      if (specificSubject === '') {
-        matchesSpecific = true; // No filter
-      } else if (subjectCategory === 'languages' && level) {
-        // For languages with level, match the combined string
-        const expectedSubject = `${specificSubject} Level ${level}`;
-        matchesSpecific = slotData.subject === expectedSubject;
-      } else {
-        // For non-language or no level specified, match just the subject
-        matchesSpecific = slotData.subject === specificSubject || slotData.subject?.startsWith(specificSubject);
-      }
+      // Filter by search term and date
+      const matchesSearch = !searchTerm || 
+        slotData.subject?.toLowerCase().includes(searchTerm) ||
+        slotData.subjectCategory?.toLowerCase().includes(searchTerm);
       
       const matchesDate = !date || slotData.date === date;
       
-      if (matchesCategory && matchesSpecific && matchesDate) {
+      if (matchesSearch && matchesDate) {
         tutorIds.add(slotData.tutorId);
       }
     });
@@ -2340,24 +2425,15 @@ async function loadAvailableSlots() {
     // Render cards
     slotsSnapshot.forEach(doc => {
       const slotData = doc.data();
-      const matchesCategory = subjectCategory === '' || slotData.subjectCategory === subjectCategory;
       
-      // For specific subject matching, check if level is being filtered
-      let matchesSpecific = false;
-      if (specificSubject === '') {
-        matchesSpecific = true; // No filter
-      } else if (subjectCategory === 'languages' && level) {
-        // For languages with level, match the combined string
-        const expectedSubject = `${specificSubject} Level ${level}`;
-        matchesSpecific = slotData.subject === expectedSubject;
-      } else {
-        // For non-language or no level specified, match just the subject
-        matchesSpecific = slotData.subject === specificSubject || slotData.subject?.startsWith(specificSubject);
-      }
+      // Filter by search term and date
+      const matchesSearch = !searchTerm || 
+        slotData.subject?.toLowerCase().includes(searchTerm) ||
+        slotData.subjectCategory?.toLowerCase().includes(searchTerm);
       
       const matchesDate = !date || slotData.date === date;
       
-      if (matchesCategory && matchesSpecific && matchesDate) {
+      if (matchesSearch && matchesDate) {
         found = true;
         const card = document.createElement('div');
         card.className = 'available-slot-card';
@@ -2758,33 +2834,39 @@ onAuthStateChanged(auth, async user => {
       await loadAvailableSlots();
     }
   } else {
-    signBtn.textContent = 'Sign In';
-    profilePic.src = 'avatar-placeholder.png';
-    settingsBtn.style.display = 'none';
-    
-    // Handle view when not signed in
-    if (roleSelect.value === 'events') {
-      studentSection.style.display = 'none';
-      tutorSection.style.display = 'none';
-      eventsSection.style.display = 'block';
-      eventCoordinatorPanel.style.display = 'none';
-      loadEvents(eventFilterCategory?.value || '', eventFilterTime?.value || 'upcoming');
-    } else {
-      studentSection.style.display = 'none';
-      eventsSection.style.display = 'none';
-      tutorSection.style.display = 'block';
-    }
-    
-    // Set just the role text when not signed in
-    currentRole.textContent = roleSelect.value[0].toUpperCase() + roleSelect.value.slice(1);
-    
-    // Hide My Slots and My Stats buttons when not signed in
-    if (mySlotsBtn) {
-      mySlotsBtn.style.display = 'none';
-    }
-    if (myStatsBtn) {
-      myStatsBtn.style.display = 'none';
-    }
+    // Show immediate sign-in prompt
+    alert('Please sign in to access CCA Peer Tutoring Platform');
+    signInWithPopup(auth, provider).catch(error => {
+      console.error('Sign-in error:', error);
+      // If sign-in fails or is cancelled, show basic interface
+      signBtn.textContent = 'Sign In';
+      profilePic.src = 'avatar-placeholder.png';
+      settingsBtn.style.display = 'none';
+      
+      // Handle view when not signed in
+      if (roleSelect.value === 'events') {
+        studentSection.style.display = 'none';
+        tutorSection.style.display = 'none';
+        eventsSection.style.display = 'block';
+        eventCoordinatorPanel.style.display = 'none';
+        loadEvents(eventFilterCategory?.value || '', eventFilterTime?.value || 'upcoming');
+      } else {
+        studentSection.style.display = 'none';
+        eventsSection.style.display = 'none';
+        tutorSection.style.display = 'block';
+      }
+      
+      // Set just the role text when not signed in
+      currentRole.textContent = roleSelect.value[0].toUpperCase() + roleSelect.value.slice(1);
+      
+      // Hide My Slots and My Stats buttons when not signed in
+      if (mySlotsBtn) {
+        mySlotsBtn.style.display = 'none';
+      }
+      if (myStatsBtn) {
+        myStatsBtn.style.display = 'none';
+      }
+    });
   }
 });
 
@@ -2795,8 +2877,6 @@ profileSetupForm.addEventListener('submit', async (e) => {
   const lastName = document.getElementById('last-name').value.trim();
   const userGrade = document.getElementById('user-grade').value;
   const profilePhotoFile = document.getElementById('profile-photo').files[0];
-  const neverStudent = document.getElementById('never-student').checked;
-  const neverTutor = document.getElementById('never-tutor').checked;
   
   if (!firstName || !lastName || !userGrade || !profilePhotoFile) {
     alert('Please fill in all fields and upload a profile photo');
@@ -2807,32 +2887,16 @@ profileSetupForm.addEventListener('submit', async (e) => {
     // Convert image to base64 and resize it
     const photoBase64 = await convertImageToBase64(profilePhotoFile);
     
-    // Get selected subjects
-    const helpNeededSubjects = [];
-    const tutoringSubjects = [];
-    
-    if (!neverStudent) {
-      document.querySelectorAll('input[name="help-subjects"]:checked').forEach(cb => {
-        helpNeededSubjects.push(cb.value);
-      });
-    }
-    
-    if (!neverTutor) {
-      document.querySelectorAll('input[name="tutor-subjects"]:checked').forEach(cb => {
-        tutoringSubjects.push(cb.value);
-      });
-    }
-    
     await setDoc(doc(db, 'users', auth.currentUser.uid), {
       firstName: firstName,
       lastName: lastName,
       fullName: `${firstName} ${lastName}`,
       grade: parseInt(userGrade),
       profilePhotoBase64: photoBase64,
-      helpNeededSubjects: helpNeededSubjects,
-      tutoringSubjects: tutoringSubjects,
-      neverStudent: neverStudent,
-      neverTutor: neverTutor,
+      helpNeededSubjects: [],
+      tutoringSubjects: [],
+      neverStudent: false,
+      neverTutor: false,
       createdAt: new Date(),
       updatedAt: new Date()
     });
