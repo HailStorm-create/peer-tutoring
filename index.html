@@ -40,32 +40,9 @@
       <h1>Welcome to CCA Peer Tutoring</h1>
       <p>Find available tutoring slots below</p>
       <div class="student-filters">
-        <select id="student-subject-filter">
-          <option value="">Select Subject Category</option>
-          <option value="english">English</option>
-          <option value="history">History</option>
-          <option value="math">Math</option>
-          <option value="science">Science</option>
-          <option value="other">Other</option>
-          <option value="languages">Languages</option>
-        </select>
-        <div id="specific-subject-container" style="display: none;">
-          <select id="specific-subject">
-            <option value="">Select Specific Course</option>
-          </select>
-        </div>
-        <div id="language-level-container" style="display: none;">
-          <label for="language-level">Level:</label>
-          <select id="language-level">
-            <option value="">Select Level</option>
-            <option value="1">Level 1</option>
-            <option value="2">Level 2</option>
-            <option value="3">Level 3</option>
-            <option value="4">Level 4</option>
-            <option value="5">Level 5</option>
-            <option value="AP">AP</option>
-
-          </select>
+        <div class="search-container">
+          <input type="text" id="tutor-search-input" placeholder="Search for subjects (e.g., Math, Physics, Spanish Level 2)..." autocomplete="off">
+          <div id="search-suggestions" class="search-suggestions"></div>
         </div>
         <div id="student-calendar-filter"></div>
       </div>
@@ -476,26 +453,6 @@
             Please upload a clear photo with your head and shoulders visible. Background can be anything. 
             This photo will be shown to other users after they book a meeting with you.
           </small>
-        </div>
-        <div class="form-group">
-          <label>Classes I need help in <span class="subtext">(select all that apply)</span>:</label>
-          <div id="help-needed-subjects" class="subject-checkboxes stylish-checkboxes"></div>
-          <div class="never-checkbox-group">
-            <label style="margin-top: 0.5rem;">
-              <input type="checkbox" id="never-student"> I'll never be a student (won't need tutoring)
-            </label>
-            <div class="never-subtext">You can change this at any time in your settings.</div>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Classes I'm comfortable tutoring <span class="subtext">(select all that apply)</span>:</label>
-          <div id="tutoring-subjects" class="subject-checkboxes stylish-checkboxes"></div>
-          <div class="never-checkbox-group">
-            <label style="margin-top: 0.5rem;">
-              <input type="checkbox" id="never-tutor"> I'll never be a tutor
-            </label>
-            <div class="never-subtext">You can change this at any time in your settings.</div>
-          </div>
         </div>
         <button type="submit">Save Profile</button>
       </form>
