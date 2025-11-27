@@ -1,498 +1,331 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups"/>
-  <title>CCA Peer Tutoring</title>
-  <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCA Peer Tutoring</title>
+    <link rel="stylesheet" href="style.css">
 </head>
-<body class="tutor-view">
-  <nav class="top-bar">
-    <div class="left-group">
-      <select id="role-select">
-        <option value="tutor">Tutor View</option>
-        <option value="student">Student View</option>
-        <option value="events">Events</option>
-      </select>
-    </div>
-    <div class="center-group">
-      <button id="my-slots-btn" style="display: none;" aria-label="Open My Slots panel">
-        <span class="my-slots-icon">📅</span>
-        My Slots
-      </button>
-      <button id="my-stats-btn" style="display: none;" aria-label="Open My Stats panel">
-        <span class="my-stats-icon">📊</span>
-        My Stats
-      </button>
-    </div>
-    <div class="right-group">
-      <button id="sign-btn">Sign In</button>
-      <button id="settings-btn" style="display: none;">Settings</button>
-      <span id="current-role">Tutor</span>
-      <img id="profile-pic" src="avatar-placeholder.png" alt="Profile" />
-    </div>
-  </nav>
+<body>
+    <!-- Header -->
+    <header>
+        <h1>CCA Peer Tutoring</h1>
+        <nav>
+            <span id="headerUserName" class="user-name-header" style="display: none;"></span>
+            <button id="loginBtn">Login with Google</button>
+            <button id="logoutBtn" style="display: none;">Logout</button>
+        </nav>
+    </header>
 
-
-  <main class="content">
-    <section class="hero tutor-section" id="available-section">
-      <h1>Welcome to CCA Peer Tutoring</h1>
-      <p>Find available tutoring slots below</p>
-      <div class="student-filters">
-        <div class="search-container">
-          <input type="text" id="tutor-search-input" placeholder="Search for subjects (e.g., Math, Physics, Spanish Level 2)..." autocomplete="off">
-          <div id="search-suggestions" class="search-suggestions"></div>
-        </div>
-        <div id="student-calendar-filter"></div>
-      </div>
-      <div id="available-slots" class="slots-grid"></div>
-    </section>
-
-    <section class="student-section" style="display: none;" id="student-section">
-      <h2>My Availability Slots</h2>
-      <div class="add-slot-form centered-slot-form">
-        <h3 style="text-align:center;margin-bottom:1.2rem;">Add New Slot</h3>
-        <form id="slot-form">
-          <div class="form-group">
-            <label for="custom-calendar">Date:</label>
-            <div id="custom-calendar-container"></div>
-            <input type="hidden" id="slot-date" required>
-            <div id="date-warning" class="date-warning"></div>
-          </div>
-          <div class="form-group">
-            <label for="start-time">Start Time:</label>
-            <select id="start-time" required></select>
-          </div>
-          <div class="form-group">
-            <label for="duration">Duration:</label>
-            <select id="duration" required>
-              <option value="30">30 minutes</option>
-              <option value="60">1 hour</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="location-select">Location:</label>
-            <select id="location-select" required>
-              <option value="">Select Location</option>
-              <option>Library</option>
-              <option>Cafeteria</option>
-              <option value="school">School Building</option>
-            </select>
-          </div>
-          <div id="building-select-container" style="display: none;">
-            <select id="building-select" required>
-              <option value="">Select Building</option>
-            </select>
-            <select id="room-select" required>
-              <option value="">Select Room</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="subject-category">Subject Category:</label>
-            <select id="subject-category" required>
-              <option value="">Select Subject Category</option>
-              <option value="english">English</option>
-              <option value="history">History</option>
-              <option value="math">Math</option>
-              <option value="science">Science</option>
-              <option value="other">Other</option>
-              <option value="languages">Languages</option>
-            </select>
-          </div>
-          <div id="form-specific-subject-container" style="display: none;">
-            <select id="form-specific-subject" required>
-              <option value="">Select Specific Course</option>
-            </select>
-          </div>
-          <div id="form-language-level-container" style="display: none;">
-            <label for="form-language-level">Level:</label>
-            <select id="form-language-level">
-              <option value="">Select Level</option>
-              <option value="1">Level 1</option>
-              <option value="2">Level 2</option>
-              <option value="3">Level 3</option>
-              <option value="4">Level 4</option>
-              <option value="5">Level 5</option>
-              <option value="AP">AP</option>
-            </select>
-          </div>
-          <button type="submit" class="add-slot-btn">Add Slot</button>
-        </form>
-      </div>
-      <div id="slots-list"></div>
-    </section>
-
-    <!-- Admin Panel Section -->
-    <section class="admin-section" style="display: none;" id="admin-section">
-      <div class="admin-header">
-        <h1>📊 Administrator Dashboard</h1>
-        <p class="admin-subtitle">Comprehensive analytics of peer tutoring sessions</p>
-      </div>
-
-      <div class="admin-controls">
-        <div class="view-selector">
-          <button class="view-btn active" data-view="monthly" id="monthly-view-btn">Monthly</button>
-          <button class="view-btn" data-view="weekly" id="weekly-view-btn">Weekly</button>
-          <button class="view-btn" data-view="yearly" id="yearly-view-btn">Yearly</button>
-        </div>
-        
-        <div class="period-navigation">
-          <button id="prev-period" class="nav-btn">◀</button>
-          <span id="current-period" class="period-display">October 2025</span>
-          <button id="next-period" class="nav-btn">▶</button>
-        </div>
-      </div>
-
-      <div class="admin-stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon">📚</div>
-          <div class="stat-content">
-            <div class="stat-value" id="total-sessions">0</div>
-            <div class="stat-label">Total Sessions</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">👥</div>
-          <div class="stat-content">
-            <div class="stat-value" id="unique-students">0</div>
-            <div class="stat-label">Unique Students</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">👨‍🏫</div>
-          <div class="stat-content">
-            <div class="stat-value" id="unique-tutors">0</div>
-            <div class="stat-label">Active Tutors</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">⏱️</div>
-          <div class="stat-content">
-            <div class="stat-value" id="total-hours">0</div>
-            <div class="stat-label">Total Hours</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="admin-charts">
-        <div class="chart-container">
-          <h3>Sessions by Subject</h3>
-          <div id="subject-chart" class="chart"></div>
-        </div>
-        
-        <div class="chart-container">
-          <h3>Sessions Over Time</h3>
-          <div id="timeline-chart" class="chart"></div>
-        </div>
-      </div>
-
-      <div class="admin-tables">
-        <div class="table-container">
-          <h3>Top Subjects</h3>
-          <div id="top-subjects-table"></div>
-        </div>
-        
-        <div class="table-container">
-          <h3>Recent Sessions</h3>
-          <div id="recent-sessions-table"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Events Section -->
-    <section class="events-section" style="display: none;" id="events-section">
-      <div class="events-header">
-        <h1>🎉 Upcoming Events</h1>
-        <p class="events-subtitle">Join peer tutoring events and activities</p>
-      </div>
-      
-      <!-- Event Coordinator Panel (only visible to coordinators) -->
-      <div id="event-coordinator-panel" style="display: none;">
-        <div class="coordinator-banner">
-          <span class="coordinator-icon">🎯</span>
-          <span>Event Coordinator Panel</span>
-        </div>
-        
-        <div class="create-event-form-container">
-          <h3>Create New Event</h3>
-          <form id="create-event-form">
-            <div class="form-row">
-              <div class="form-group">
-                <label for="event-title">Event Title:</label>
-                <input type="text" id="event-title" required placeholder="e.g., Study Group Session">
-              </div>
-              <div class="form-group">
-                <label for="event-category">Category:</label>
-                <select id="event-category" required>
-                  <option value="">Select Category</option>
-                  <option value="study-group">Study Group</option>
-                  <option value="workshop">Workshop</option>
-                  <option value="social">Social Event</option>
-                  <option value="competition">Competition</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
+    <!-- Main Content -->
+    <main>
+        <!-- Login/Welcome Screen -->
+        <div id="loginScreen" class="screen">
+            <div class="login-container">
+                <h2>Welcome to CCA Peer Tutoring</h2>
+                <p>Connect with fellow students and get the help you need!</p>
+                <button id="googleSignIn" class="btn-primary">Sign in with Google</button>
             </div>
-            
-            <div class="form-group">
-              <label for="event-description">Description:</label>
-              <textarea id="event-description" rows="3" required placeholder="Describe the event..."></textarea>
-            </div>
-            
-            <div class="form-row">
-              <div class="form-group">
-                <label for="event-date">Date:</label>
-                <input type="date" id="event-date" required>
-              </div>
-              <div class="form-group">
-                <label for="event-start-time">Start Time:</label>
-                <input type="time" id="event-start-time" required>
-              </div>
-              <div class="form-group">
-                <label for="event-end-time">End Time:</label>
-                <input type="time" id="event-end-time" required>
-              </div>
-            </div>
-            
-            <div class="form-row">
-              <div class="form-group">
-                <label for="event-location">Location:</label>
-                <input type="text" id="event-location" required placeholder="e.g., Library Room 101">
-              </div>
-              <div class="form-group">
-                <label for="event-max-attendees">Max Attendees:</label>
-                <input type="number" id="event-max-attendees" min="1" placeholder="Leave empty for unlimited">
-              </div>
-            </div>
-            
-            <button type="submit" class="create-event-btn">Create Event</button>
-          </form>
         </div>
-        
-        <div class="coordinator-events-list">
-          <h3>Your Created Events</h3>
-          <div id="coordinator-events-grid"></div>
-        </div>
-      </div>
-      
-      <!-- Events Grid (visible to all users) -->
-      <div class="events-filters">
-        <select id="event-filter-category">
-          <option value="">All Categories</option>
-          <option value="study-group">Study Group</option>
-          <option value="workshop">Workshop</option>
-          <option value="social">Social Event</option>
-          <option value="competition">Competition</option>
-          <option value="other">Other</option>
-        </select>
-        
-        <select id="event-filter-time">
-          <option value="upcoming">Upcoming Events</option>
-          <option value="today">Today</option>
-          <option value="this-week">This Week</option>
-          <option value="this-month">This Month</option>
-        </select>
-      </div>
-      
-      <div id="events-grid" class="events-grid"></div>
-    </section>
-  </main>
 
-  <!-- Footer -->
-  <footer class="bottom-bar">
-    <div class="footer-content">
-      <span>Made by Aditya Shah</span>
-      <span class="footer-divider">|</span>
-      <span>Contact us: <a href="mailto:peertutoring.cca@gmail.com">peertutoring.cca@gmail.com</a></span>
+        <!-- User Setup Screen (for new users) -->
+        <div id="setupScreen" class="screen" style="display: none;">
+            <div class="setup-container">
+                <h2>Create Your Tutor Card</h2>
+                <form id="tutorSetupForm">
+                    <div class="form-group">
+                        <label for="tutorName">Full Name:</label>
+                        <input type="text" id="tutorName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="tutorGrade">Grade:</label>
+                        <select id="tutorGrade" required>
+                            <option value="">Select Grade</option>
+                            <option value="9">Grade 9</option>
+                            <option value="10">Grade 10</option>
+                            <option value="11">Grade 11</option>
+                            <option value="12">Grade 12</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="profilePicture">Profile Picture (Required):</label>
+                        <input type="file" id="profilePicture" accept="image/*" required>
+                        <div class="profile-picture-requirements">
+                            <p><strong>Requirements:</strong></p>
+                            <ul>
+                                <li>Clear head and shoulders photo</li>
+                                <li>Must be appropriate for a school environment</li>
+                                <li>No sunglasses, hats, or face coverings</li>
+                                <li>Recommended size: 400x400 pixels or higher</li>
+                            </ul>
+                        </div>
+                        <div id="profilePicturePreview" class="profile-picture-preview" style="display: none;"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="isTutorCheckbox" checked>
+                            I want to be a tutor (you can change this at any time)
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>Subjects you can tutor:</label>
+                        <div id="subjectSelection" class="subject-selection"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="tutorBio">Short Bio:</label>
+                        <textarea id="tutorBio" placeholder="Tell others about yourself and your tutoring experience"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="tutorAvailability">Availability:</label>
+                        <textarea id="tutorAvailability" placeholder="e.g. Mon-Fri 3-5 PM, Weekends flexible"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="communicationMethod">Method of Communication:</label>
+                        <select id="communicationMethod" required>
+                            <option value="">Select Communication Method</option>
+                            <option value="in-person">in-person</option>
+                            <option value="online">online</option>
+                            <option value="both">both</option>
+                        </select>
+                    </div>
+
+                    <div class="setup-actions">
+                        <button type="button" id="cancelSetupBtn" class="btn-secondary">Cancel</button>
+                        <button type="submit" class="btn-primary">Save Profile</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Main App Screen -->
+        <div id="appScreen" class="screen" style="display: none;">
+            <!-- Navigation Tabs -->
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="booking">Find Tutors</button>
+                <button class="tab-btn" data-tab="myrequests">My Requests</button>
+                <button class="tab-btn" data-tab="myslots">My Slots</button>
+                <button class="tab-btn" data-tab="events">Events </button>
+                <button class="tab-btn stats-admin-only" data-tab="stats" style="display: none;">Statistics</button>
+                <button class="tab-btn" data-tab="profile">My Profile</button>
+            </div>
+
+            <!-- Booking View -->
+            <div id="bookingTab" class="tab-content active">
+                <div class="search-container">
+                    <input type="text" id="subjectSearch" placeholder="Search tutors by subject or name...">
+                </div>
+                <div id="tutorCards" class="tutor-grid"></div>
+            </div>
+
+            <!-- My Requests View -->
+            <div id="myrequestsTab" class="tab-content">
+                <h2>My Booking Requests</h2>
+                <p>Current pending and declined requests that you've sent or received</p>
+                <div id="myRequests" class="requests-container"></div>
+            </div>
+
+            <!-- My Slots View -->
+            <div id="myslotsTab" class="tab-content">
+                <h2>My Tutoring Sessions</h2>
+                <p>All your confirmed and declined sessions displayed in calendar format</p>
+                <div id="mySlots" class="slots-container">
+                    <div id="slotsCalendar" class="calendar-view"></div>
+                </div>
+            </div>
+
+            <!-- Profile View -->
+            <div id="profileTab" class="tab-content">
+                <h2>My Profile</h2>
+                <div id="profileInfo" class="profile-container"></div>
+                <button id="editProfileBtn" class="btn-secondary">Edit Profile</button>
+            </div>
+
+            <!-- Events View -->
+            <div id="eventsTab" class="tab-content">
+                <div class="events-header">
+                    <h2>CCA Events</h2>
+                    <button id="createEventBtn" class="btn-primary admin-only" style="display: none;">Create Event</button>
+                </div>
+                <div class="event-coordinator-info">
+                    <p>💡 <strong>Want to become an event coordinator?</strong> Help organize study sessions and tutoring events! Email us at <strong>peertutoring.cca@gmail.com</strong></p>
+                </div>
+                <div class="events-container">
+                    <div id="eventsList" class="events-list"></div>
+                </div>
+            </div>
+
+            <!-- Statistics View (Admin Only) -->
+            <div id="statsTab" class="tab-content">
+                <h2>Tutoring Statistics Dashboard</h2>
+                <div class="stats-container">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3>Total Sessions</h3>
+                            <div class="stat-number" id="totalSessions">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Active Tutors</h3>
+                            <div class="stat-number" id="activeTutors">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Pending Requests</h3>
+                            <div class="stat-number" id="pendingRequests">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>This Week's Sessions</h3>
+                            <div class="stat-number" id="weekSessions">0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stats-section">
+                        <h3>Sessions by Subject</h3>
+                        <div id="subjectStats" class="subject-stats"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Booking Modal -->
+    <div id="bookingModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Request Tutoring Session</h3>
+            <form id="bookingForm">
+                <input type="hidden" id="selectedTutorId">
+                <div class="form-group">
+                    <label for="requestSubject">Subject:</label>
+                    <input type="text" id="requestSubject" placeholder="Start typing a subject..." required>
+                </div>
+                <div class="form-group">
+                    <label for="requestDate">Preferred Date:</label>
+                    <input type="date" id="requestDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Preferred Start Time:</label>
+                    <div class="time-picker">
+                        <select id="requestTimeHour" required>
+                            <option value="">Hour</option>
+                            <option value="08">8 AM</option>
+                            <option value="09">9 AM</option>
+                            <option value="10">10 AM</option>
+                            <option value="11">11 AM</option>
+                            <option value="12">12 PM</option>
+                            <option value="13">1 PM</option>
+                            <option value="14">2 PM</option>
+                            <option value="15">3 PM</option>
+                            <option value="16">4 PM</option>
+                            <option value="17">5 PM</option>
+                            <option value="18">6 PM</option>
+                            <option value="19">7 PM</option>
+                            <option value="20">8 PM</option>
+                        </select>
+                        <select id="requestTimeMinute" required>
+                            <option value="">Minute</option>
+                            <option value="00">:00</option>
+                            <option value="15">:15</option>
+                            <option value="30">:30</option>
+                            <option value="45">:45</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="requestDuration">Duration:</label>
+                    <select id="requestDuration" required>
+                        <option value="">Select Duration</option>
+                        <option value="15">15 minutes</option>
+                        <option value="30">30 minutes</option>
+                        <option value="45">45 minutes</option>
+                        <option value="60">1 hour</option>
+                        <option value="75">1 hour 15 minutes</option>
+                        <option value="90">1 hour 30 minutes</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="requestLocation">Preferred Location:</label>
+                    <select id="requestLocation" required>
+                        <option value="">Select Location</option>
+                        <option value="online">Online (Zoom/Discord/etc.)</option>
+                        <option value="in-person">in-person</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="requestNotes">Additional Notes:</label>
+                    <textarea id="requestNotes" placeholder="Any specific topics or questions?"></textarea>
+                </div>
+                <button type="submit" class="btn-primary">Send Request</button>
+            </form>
+        </div>
     </div>
-  </footer>
 
-  <!-- My Slots Side Panel -->
-  <div id="my-slots-panel" class="slots-panel" role="dialog" aria-labelledby="my-slots-title" aria-hidden="true">
-    <div class="slots-panel-overlay" aria-hidden="true"></div>
-    <div class="slots-panel-content">
-      <div class="slots-panel-header">
-        <h2 id="my-slots-title">My Slots</h2>
-        <button id="close-slots-panel" class="close-panel-btn" aria-label="Close My Slots panel">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-      
-      <div class="slots-panel-body">
-        <div class="slots-section">
-          <h3 class="slots-section-title">
-            <span class="section-icon">👨‍🏫</span>
-            Slots I'm Tutoring
-          </h3>
-          <div id="tutoring-slots" class="slots-list">
-            <div class="slots-loading">Loading your tutoring slots...</div>
-          </div>
-          <div id="tutoring-empty" class="empty-state" style="display: none;">
-            <div class="empty-icon">📚</div>
-            <h4>No tutoring slots yet</h4>
-            <p>Ready to share your knowledge? Add your availability to help other students.</p>
-            <button class="empty-action-btn" onclick="document.getElementById('role-select').value='tutor'; document.getElementById('role-select').dispatchEvent(new Event('change'));">
-              Add Availability
-            </button>
-          </div>
+    <!-- Event Creation Modal -->
+    <div id="eventModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeEventModal()">&times;</span>
+            <h3>Create New Event</h3>
+            <form id="eventForm">
+                <div class="form-group">
+                    <label for="eventTitle">Event Title:</label>
+                    <input type="text" id="eventTitle" placeholder="e.g. Study Session for AP Exams" required>
+                </div>
+                <div class="form-group">
+                    <label for="eventDescription">Description:</label>
+                    <textarea id="eventDescription" placeholder="Detailed description of the event..." required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="eventDate">Date:</label>
+                    <input type="date" id="eventDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Start Time:</label>
+                    <div class="time-picker">
+                        <select id="eventTimeHour" required>
+                            <option value="">Hour</option>
+                            <option value="08">8 AM</option>
+                            <option value="09">9 AM</option>
+                            <option value="10">10 AM</option>
+                            <option value="11">11 AM</option>
+                            <option value="12">12 PM</option>
+                            <option value="13">1 PM</option>
+                            <option value="14">2 PM</option>
+                            <option value="15">3 PM</option>
+                            <option value="16">4 PM</option>
+                            <option value="17">5 PM</option>
+                            <option value="18">6 PM</option>
+                            <option value="19">7 PM</option>
+                            <option value="20">8 PM</option>
+                        </select>
+                        <select id="eventTimeMinute" required>
+                            <option value="">Minute</option>
+                            <option value="00">:00</option>
+                            <option value="15">:15</option>
+                            <option value="30">:30</option>
+                            <option value="45">:45</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="eventLocation">Location:</label>
+                    <input type="text" id="eventLocation" placeholder="e.g. Library Study Room 3" required>
+                </div>
+                <div class="form-group">
+                    <label for="eventCapacity">Max Participants:</label>
+                    <input type="number" id="eventCapacity" min="1" max="100" placeholder="20" required>
+                </div>
+                <button type="submit" class="btn-primary">Create Event</button>
+            </form>
         </div>
-
-        <div class="slots-section">
-          <h3 class="slots-section-title">
-            <span class="section-icon">🎓</span>
-            Slots I'm Getting Tutored
-          </h3>
-          <div id="tutored-slots" class="slots-list">
-            <div class="slots-loading">Loading your tutored slots...</div>
-          </div>
-          <div id="tutored-empty" class="empty-state" style="display: none;">
-            <div class="empty-icon">🔍</div>
-            <h4>No tutoring sessions booked</h4>
-            <p>Need help with a subject? Browse available tutors and book a session.</p>
-            <button class="empty-action-btn" onclick="document.getElementById('role-select').value='student'; document.getElementById('role-select').dispatchEvent(new Event('change'));">
-              Browse Tutors
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
-  </div>
 
-  <!-- My Stats Side Panel -->
-  <div id="my-stats-panel" class="slots-panel" role="dialog" aria-labelledby="my-stats-title" aria-hidden="true">
-    <div class="slots-panel-overlay" aria-hidden="true"></div>
-    <div class="slots-panel-content">
-      <div class="slots-panel-header">
-        <h2 id="my-stats-title">My Tutoring Stats</h2>
-        <button id="close-stats-panel" class="close-panel-btn" aria-label="Close My Stats panel">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-      
-      <div class="slots-panel-body">
-        <!-- Hours Overview Section -->
-        <div class="stats-section">
-          <h3 class="stats-section-title">
-            <span class="section-icon">⏱️</span>
-            Hours Overview
-          </h3>
-          <div class="stats-cards-grid">
-            <div class="stat-mini-card">
-              <div class="stat-mini-icon">✅</div>
-              <div class="stat-mini-value" id="completed-hours">0</div>
-              <div class="stat-mini-label">Completed Hours</div>
-            </div>
-            <div class="stat-mini-card">
-              <div class="stat-mini-icon">📅</div>
-              <div class="stat-mini-value" id="planned-hours">0</div>
-              <div class="stat-mini-label">Upcoming Hours</div>
-            </div>
-            <div class="stat-mini-card">
-              <div class="stat-mini-icon">📊</div>
-              <div class="stat-mini-value" id="total-hours-stat">0</div>
-              <div class="stat-mini-label">Total Hours</div>
-            </div>
-          </div>
+    <!-- Footer -->
+    <footer class="app-footer">
+        <div class="footer-content">
+            <p><strong>peertutoring.cca@gmail.com</strong></p>
+            <p><strong>Made by Aditya Shah</strong></p>
         </div>
+    </footer>
 
-        <!-- Subject Breakdown by Category -->
-        <div class="stats-section">
-          <h3 class="stats-section-title">
-            <span class="section-icon">📚</span>
-            Hours by Subject Category
-          </h3>
-          <div id="category-breakdown" class="subject-breakdown">
-            <div class="stats-loading">Loading subject data...</div>
-          </div>
-        </div>
-
-        <!-- Subject Breakdown by Specific Course -->
-        <div class="stats-section">
-          <h3 class="stats-section-title">
-            <span class="section-icon">📖</span>
-            Hours by Specific Course
-          </h3>
-          <div id="course-breakdown" class="subject-breakdown">
-            <div class="stats-loading">Loading course data...</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Load Firebase logic -->
-  <script type="module" src="actual.js"></script>
-
-  <div id="profile-setup-modal" class="modal" style="display: none;">
-    <div class="modal-content">
-      <h2>Complete Your Profile</h2>
-      <form id="profile-setup-form">
-        <div class="form-group">
-          <label for="first-name">First Name:</label>
-          <input type="text" id="first-name" required>
-        </div>
-        <div class="form-group">
-          <label for="last-name">Last Name:</label>
-          <input type="text" id="last-name" required>
-        </div>
-        <div class="form-group">
-          <label for="user-grade">Grade:</label>
-          <select id="user-grade" required>
-            <option value="">Select Grade</option>
-            <option value="9">9th Grade</option>
-            <option value="10">10th Grade</option>
-            <option value="11">11th Grade</option>
-            <option value="12">12th Grade</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="profile-photo">Profile Photo (head and shoulders in view):</label>
-          <input type="file" id="profile-photo" accept="image/*" required>
-          <small style="color: #666; display: block; margin-top: 0.3em;">
-            Please upload a clear photo with your head and shoulders visible. Background can be anything. 
-            This photo will be shown to other users after they book a meeting with you.
-          </small>
-        </div>
-        <button type="submit">Save Profile</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Settings Modal -->
-  <div id="settings-modal" class="modal" style="display: none;">
-    <div class="modal-content">
-      <span id="close-settings-modal" style="float:right;cursor:pointer;font-size:1.5em;">&times;</span>
-      <h2>Profile Settings</h2>
-      <div class="settings-tabs">
-        <button type="button" id="student-settings-tab" class="tab-button active">Student Settings</button>
-        <button type="button" id="tutor-settings-tab" class="tab-button">Tutor Settings</button>
-      </div>
-      
-      <div id="student-settings" class="settings-tab-content">
-        <h3>Classes I need help in <span class="subtext">(select all that apply)</span>:</h3>
-        <div id="student-help-subjects" class="subject-checkboxes stylish-checkboxes"></div>
-        <div class="never-checkbox-group">
-          <label style="margin-top: 0.5rem;">
-            <input type="checkbox" id="settings-never-student"> I'll never be a student (won't need tutoring)
-          </label>
-          <div class="never-subtext">You can change this at any time in your settings.</div>
-        </div>
-        <button type="button" id="save-student-settings">Save Student Settings</button>
-      </div>
-      
-      <div id="tutor-settings" class="settings-tab-content" style="display: none;">
-        <h3>Classes I'm comfortable tutoring <span class="subtext">(select all that apply)</span>:</h3>
-        <div id="tutor-help-subjects" class="subject-checkboxes stylish-checkboxes"></div>
-        <div class="never-checkbox-group">
-          <label style="margin-top: 0.5rem;">
-            <input type="checkbox" id="settings-never-tutor"> I'll never be a tutor
-          </label>
-          <div class="never-subtext">You can change this at any time in your settings.</div>
-        </div>
-        <button type="button" id="save-tutor-settings">Save Tutor Settings</button>
-      </div>
-    </div>
-  </div>
+    <!-- Scripts -->
+    <script type="module" src="actual.js"></script>
 </body>
 </html>
