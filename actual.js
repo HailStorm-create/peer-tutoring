@@ -112,9 +112,18 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 const provider = new GoogleAuthProvider();
 
+// Admin email lists
+const EVENT_ADMIN_EMAILS = ['adityavshah10@gmail.com']; // Event organizers only
+const STATS_ADMIN_EMAILS = ['adityavshah10@gmail.com']; // Stats access only, no website access
+
 // Global state
 let currentUser = null;
 let allTutors = [];
+
+// Calendar state variables
+let currentCalendarSlots = [];
+let currentCalendarYear = new Date().getFullYear();
+let currentCalendarMonth = new Date().getMonth();
 
 // DOM elements
 const loginScreen = document.getElementById('loginScreen');
@@ -264,32 +273,13 @@ tutorSetupForm.addEventListener('submit', async (e) => {
     
     if (!currentUser) return;
     
-    // Validate profile picture is uploaded
-    const profilePictureInput = document.getElementById('profilePicture');
-    if (!profilePictureInput.files[0]) {
-        showMessage('Please upload a profile picture that meets the requirements', 'error');
-        return;
-    }
-    
-    // Validate profile picture meets requirements
-    const file = profilePictureInput.files[0];
-    if (!await validateProfilePicture(file)) {
-        return; // Error message shown in validation function
-    }
-    
     const selectedSubjects = Array.from(document.querySelectorAll('.subject-checkbox:checked'))
         .map(cb => cb.value);
     
     const isTutor = document.getElementById('isTutorCheckbox').checked;
     
-    let profilePictureUrl = '';
-    try {
-        // Upload profile picture to Firebase Storage
-        profilePictureUrl = await uploadProfilePicture(file);
-    } catch (error) {
-        showMessage('Error uploading profile picture. Please try again.', 'error');
-        return;
-    }
+    // Use a placeholder profile picture URL
+    const profilePictureUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName || 'User')}&size=200&background=dc2626&color=fff`;
     
     const tutorData = {
         userId: currentUser.uid,
@@ -345,23 +335,7 @@ async function validateProfilePicture(file) {
     return true;
 }
 
-// Profile picture preview functionality
-document.getElementById('profilePicture').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    const preview = document.getElementById('profilePicturePreview');
-    
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            preview.innerHTML = `<img src="${e.target.result}" alt="Profile Preview">`;
-            preview.style.display = 'block';
-        };
-        reader.readAsDataURL(file);
-    } else {
-        preview.style.display = 'none';
-        preview.innerHTML = '';
-    }
-});
+// Profile picture functionality removed - using placeholder avatars
 
 // Load and display tutors
 async function loadTutors() {
@@ -395,21 +369,31 @@ function displayTutors(tutors) {
         return;
     }
     
-    tutorCards.innerHTML = tutors.map(tutor => `
-        <div class="tutor-card">
-            <h3>${tutor.name}</h3>
-            <div class="tutor-grade">Grade ${tutor.grade}</div>
-            <div class="tutor-subjects">
-                ${tutor.subjects.map(subject => `<span class="subject-tag">${subject}</span>`).join('')}
+    tutorCards.innerHTML = tutors.map(tutor => {
+        // Limit subjects display to first 3 on the card for better visibility
+        let displaySubjects = '';
+        if (tutor.subjects && tutor.subjects.length > 0) {
+            const maxSubjects = 3;
+            const subjectsToShow = tutor.subjects.slice(0, maxSubjects);
+            const hasMore = tutor.subjects.length > maxSubjects;
+            displaySubjects = `<div class="tutor-subjects">📚 ${subjectsToShow.join(', ')}${hasMore ? `, +${tutor.subjects.length - maxSubjects} more...` : ''}</div>`;
+        }
+        
+        return `
+            <div class="tutor-card">
+                <h3>${tutor.name} <span class="grade-badge">Grade ${tutor.grade}</span></h3>
+                ${displaySubjects}
+                ${tutor.availability ? `<div class="tutor-availability">📅 ${tutor.availability}</div>` : ''}
+                ${tutor.communicationMethod ? `<div class="tutor-communication">💬 Contact via ${tutor.communicationMethod}${tutor.communicationDetails ? ': ' + tutor.communicationDetails : ''}</div>` : ''}
+                ${tutor.bio ? `<button class="view-bio-btn" onclick="openBioModal('${tutor.id}')">
+                    📖 View Bio
+                </button>` : ''}
+                <button class="book-btn" onclick="openBookingModal('${tutor.id}', '${tutor.name}')">
+                    Request Tutoring
+                </button>
             </div>
-            ${tutor.bio ? `<div class="tutor-bio">${tutor.bio}</div>` : ''}
-            ${tutor.availability ? `<div class="tutor-availability">📅 ${tutor.availability}</div>` : ''}
-            ${tutor.communicationMethod ? `<div class="tutor-communication">💬 Contact via ${tutor.communicationMethod}${tutor.communicationDetails ? ': ' + tutor.communicationDetails : ''}</div>` : ''}
-            <button class="book-btn" onclick="openBookingModal('${tutor.id}', '${tutor.name}')">
-                Request Tutoring
-            </button>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // Search functionality (replaced by autocomplete setup)
@@ -449,14 +433,63 @@ function openBookingModal(tutorId, tutorName) {
 // Make functions globally available
 window.openBookingModal = openBookingModal;
 
+// Bio modal functions
+function openBioModal(tutorId) {
+    const tutor = allTutors.find(t => t.id === tutorId);
+    if (!tutor) return;
+    
+    const bioModal = document.getElementById('bioModal');
+    const bioModalName = document.getElementById('bioModalName');
+    const bioModalContent = document.getElementById('bioModalContent');
+    
+    bioModalName.textContent = tutor.name;
+    bioModalContent.innerHTML = `
+        <p><strong>Grade:</strong> ${tutor.grade}</p>
+        ${tutor.subjects && tutor.subjects.length > 0 ? `<p><strong>Subjects:</strong> ${tutor.subjects.join(', ')}</p>` : ''}
+        ${tutor.bio ? `<p><strong>Bio:</strong></p><p>${tutor.bio}</p>` : '<p>No bio available.</p>'}
+    `;
+    
+    bioModal.style.display = 'block';
+}
+
+function closeBioModal() {
+    document.getElementById('bioModal').style.display = 'none';
+}
+
+window.openBioModal = openBioModal;
+window.closeBioModal = closeBioModal;
+
+// Track requests being processed to prevent duplicate actions
+const processingRequests = new Set();
+
 // Function to update request status (accept/decline)
 async function updateRequestStatus(requestId, newStatus, declineMessage = '') {
+    // Prevent duplicate processing
+    if (processingRequests.has(requestId)) {
+        console.log('Request already being processed:', requestId);
+        return;
+    }
+    
+    processingRequests.add(requestId);
+    
     try {
         const requestRef = doc(db, 'bookingRequests', requestId);
         
         // Get the request data first to send to Google Sheets
         const requestDoc = await getDoc(requestRef);
+        if (!requestDoc.exists()) {
+            throw new Error('Request not found');
+        }
+        
         const requestData = requestDoc.data();
+        
+        // Check if already processed
+        if (requestData.status === 'accepted' || requestData.status === 'declined') {
+            showMessage('This request has already been processed.', 'error');
+            processingRequests.delete(requestId);
+            loadMyRequests();
+            return;
+        }
         
         // Update the request status
         const updateData = { status: newStatus };
@@ -480,6 +513,8 @@ async function updateRequestStatus(requestId, newStatus, declineMessage = '') {
     } catch (error) {
         console.error('Error updating request status:', error);
         showMessage('Error updating request status. Please try again.', 'error');
+    } finally {
+        processingRequests.delete(requestId);
     }
 }
 
@@ -704,17 +739,17 @@ async function loadMySlots() {
     try {
         slotsCalendar.innerHTML = '<div class="loading"></div>';
         
-        // Get all requests (accepted and declined) where user is the student or tutor
+        // Get only accepted requests where user is the student or tutor
         const studentQuery = query(
             collection(db, 'bookingRequests'),
             where('studentId', '==', currentUser.uid),
-            where('status', 'in', ['accepted', 'declined'])
+            where('status', '==', 'accepted')
         );
         
         const tutorQuery = query(
             collection(db, 'bookingRequests'),
             where('tutorId', '==', currentUser.uid),
-            where('status', 'in', ['accepted', 'declined'])
+            where('status', '==', 'accepted')
         );
         
         const [studentSnapshot, tutorSnapshot] = await Promise.all([
@@ -859,10 +894,6 @@ function generateCalendarHTML(slots, year, month) {
     return html;
 }
 
-let currentCalendarSlots = [];
-let currentCalendarYear = new Date().getFullYear();
-let currentCalendarMonth = new Date().getMonth();
-
 function setupCalendarNavigation(slots) {
     currentCalendarSlots = slots;
     currentCalendarYear = new Date().getFullYear();
@@ -914,11 +945,6 @@ function closeSessionModal() {
     document.getElementById('sessionModal').style.display = 'none';
 }
 
-// Make functions globally available
-window.navigateCalendar = navigateCalendar;
-window.showSessionDetails = showSessionDetails;
-window.closeSessionModal = closeSessionModal;
-
 // Functions for accept and decline with optional message
 function acceptRequest(requestId) {
     updateRequestStatus(requestId, 'accepted');
@@ -929,7 +955,10 @@ function declineRequest(requestId) {
     updateRequestStatus(requestId, 'declined', message || '');
 }
 
-// Make new functions globally available
+// Make functions globally available
+window.navigateCalendar = navigateCalendar;
+window.showSessionDetails = showSessionDetails;
+window.closeSessionModal = closeSessionModal;
 window.acceptRequest = acceptRequest;
 window.declineRequest = declineRequest;
 async function loadProfile() {
@@ -979,7 +1008,6 @@ editProfileBtn.addEventListener('click', async () => {
             document.getElementById('tutorBio').value = profile.bio || '';
             document.getElementById('tutorAvailability').value = profile.availability || '';
             document.getElementById('communicationMethod').value = profile.communicationMethod || '';
-            document.getElementById('communicationDetails').value = profile.communicationDetails || '';
             document.getElementById('isTutorCheckbox').checked = profile.isTutor !== false;
             
             // Show/hide communication details based on method
@@ -1133,7 +1161,7 @@ async function writeToGoogleSheetsViaAppsScript(requestData) {
             startTime: requestData.preferredStartTime || '',
             endTime: requestData.preferredEndTime || '',
             location: requestData.preferredLocation || '',
-            action: 'request'
+            action: requestData.action || 'request'
         };
         
         console.log('Attempting to write to Google Sheets via Apps Script...');
@@ -1539,9 +1567,6 @@ subjectSearch.addEventListener('input', (e) => {
 });
 
 // Event_Emails System
-const EVENT_ADMIN_EMAILS = ['adityavshah10@gmail.com']; // Event organizers only
-const STATS_ADMIN_EMAILS = ['adityavshah10@gmail.com']; // Stats access only, no website access
-
 async function checkEventAdminStatus() {
     if (!currentUser) return false;
     return EVENT_ADMIN_EMAILS.includes(currentUser.email);
@@ -1873,3 +1898,154 @@ window.registerForEvent = registerForEvent;
 window.unregisterFromEvent = unregisterFromEvent;
 window.deleteEvent = deleteEvent;
 window.closeEventModal = closeEventModal;
+
+// Leaderboard System
+async function updateTutorHours(tutorId, additionalHours) {
+    try {
+        const tutorRef = doc(db, 'tutors', tutorId);
+        const tutorDoc = await getDoc(tutorRef);
+        
+        if (tutorDoc.exists()) {
+            const currentHours = tutorDoc.data().totalHours || 0;
+            await updateDoc(tutorRef, {
+                totalHours: currentHours + additionalHours
+            });
+        }
+    } catch (error) {
+        console.error('Error updating tutor hours:', error);
+    }
+}
+
+async function loadLeaderboard() {
+    try {
+        const tutorsQuery = query(
+            collection(db, 'tutors'),
+            where('isTutor', '==', true)
+        );
+        const snapshot = await getDocs(tutorsQuery);
+        
+        const tutors = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            tutors.push({
+                id: doc.id,
+                name: data.name,
+                totalHours: data.totalHours || 0
+            });
+        });
+        
+        // Sort by hours descending
+        tutors.sort((a, b) => b.totalHours - a.totalHours);
+        
+        return tutors;
+    } catch (error) {
+        console.error('Error loading leaderboard:', error);
+        return [];
+    }
+}
+
+function displayTop3Leaderboard(tutors) {
+    const top3Container = document.getElementById('leaderboardTop3');
+    const top3 = tutors.slice(0, 3);
+    
+    if (top3.length === 0) {
+        top3Container.innerHTML = '<p>No tutors with recorded hours yet.</p>';
+        return;
+    }
+    
+    const positions = ['first', 'second', 'third'];
+    const ranks = ['🥇', '🥈', '🥉'];
+    
+    top3Container.innerHTML = top3.map((tutor, index) => `
+        <div class="podium-item ${positions[index]}">
+            <div class="podium-rank">${ranks[index]}</div>
+            <div class="podium-name">${tutor.name}</div>
+            <div class="podium-hours">${tutor.totalHours}</div>
+            <div class="podium-label">hours</div>
+        </div>
+    `).join('');
+}
+
+function displayFullLeaderboard(tutors, currentUserId = null) {
+    const fullLeaderboardContainer = document.getElementById('allTutorsLeaderboard');
+    
+    if (tutors.length === 0) {
+        fullLeaderboardContainer.innerHTML = '<p>No tutors found.</p>';
+        return;
+    }
+    
+    fullLeaderboardContainer.innerHTML = tutors.map((tutor, index) => {
+        const isCurrentUser = currentUserId && tutor.id === currentUserId;
+        return `
+            <div class="leaderboard-item ${isCurrentUser ? 'current-user' : ''}" ${isCurrentUser ? 'id="currentUserPosition"' : ''}>
+                <span class="leaderboard-rank">#${index + 1}</span>
+                <span class="leaderboard-name">${tutor.name}${isCurrentUser ? ' (You)' : ''}</span>
+                <span class="leaderboard-hours">${tutor.totalHours} hours</span>
+            </div>
+        `;
+    }).join('');
+}
+
+document.getElementById('leaderboardBtn').addEventListener('click', async () => {
+    document.getElementById('leaderboardModal').style.display = 'block';
+    const tutors = await loadLeaderboard();
+    displayTop3Leaderboard(tutors);
+    
+    // Store tutors data for other functions
+    window.currentLeaderboardData = tutors;
+});
+
+document.getElementById('viewFullLeaderboardBtn').addEventListener('click', () => {
+    const fullLeaderboard = document.getElementById('fullLeaderboard');
+    if (fullLeaderboard.style.display === 'none') {
+        fullLeaderboard.style.display = 'block';
+        displayFullLeaderboard(window.currentLeaderboardData, currentUser?.uid);
+        document.getElementById('viewFullLeaderboardBtn').textContent = 'Hide Full Leaderboard';
+    } else {
+        fullLeaderboard.style.display = 'none';
+        document.getElementById('viewFullLeaderboardBtn').textContent = 'View Full Leaderboard';
+    }
+});
+
+document.getElementById('findMyPositionBtn').addEventListener('click', () => {
+    if (!currentUser) return;
+    
+    const fullLeaderboard = document.getElementById('fullLeaderboard');
+    fullLeaderboard.style.display = 'block';
+    displayFullLeaderboard(window.currentLeaderboardData, currentUser.uid);
+    document.getElementById('viewFullLeaderboardBtn').textContent = 'Hide Full Leaderboard';
+    
+    // Scroll to user's position
+    setTimeout(() => {
+        const userElement = document.getElementById('currentUserPosition');
+        if (userElement) {
+            userElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, 100);
+});
+
+function closeLeaderboardModal() {
+    document.getElementById('leaderboardModal').style.display = 'none';
+    document.getElementById('fullLeaderboard').style.display = 'none';
+    document.getElementById('viewFullLeaderboardBtn').textContent = 'View Full Leaderboard';
+}
+
+window.closeLeaderboardModal = closeLeaderboardModal;
+
+// Update tutor hours when a session is completed
+async function markSessionCompleted(sessionId, duration) {
+    try {
+        const sessionDoc = await getDoc(doc(db, 'bookingRequests', sessionId));
+        if (sessionDoc.exists()) {
+            const sessionData = sessionDoc.data();
+            const hoursCompleted = duration / 60; // Convert minutes to hours
+            
+            // Update tutor's total hours
+            await updateTutorHours(sessionData.tutorId, hoursCompleted);
+            
+            showMessage(`Session completed! ${hoursCompleted} hours added to your record.`, 'success');
+        }
+    } catch (error) {
+        console.error('Error marking session completed:', error);
+    }
+}
