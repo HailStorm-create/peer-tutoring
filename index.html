@@ -9,7 +9,12 @@
 <body>
     <!-- Header -->
     <header>
-        <h1>CCA Peer Tutoring</h1>
+        <div class="header-left">
+            <h1>CCA Peer Tutoring</h1>
+            <button id="leaderboardBtn" class="leaderboard-icon" title="View Leaderboard">
+                🏆
+            </button>
+        </div>
         <nav>
             <span id="headerUserName" class="user-name-header" style="display: none;"></span>
             <button id="loginBtn">Login with Google</button>
@@ -46,20 +51,6 @@
                             <option value="11">Grade 11</option>
                             <option value="12">Grade 12</option>
                         </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="profilePicture">Profile Picture (Required):</label>
-                        <input type="file" id="profilePicture" accept="image/*" required>
-                        <div class="profile-picture-requirements">
-                            <p><strong>Requirements:</strong></p>
-                            <ul>
-                                <li>Clear head and shoulders photo</li>
-                                <li>Must be appropriate for a school environment</li>
-                                <li>No sunglasses, hats, or face coverings</li>
-                                <li>Recommended size: 400x400 pixels or higher</li>
-                            </ul>
-                        </div>
-                        <div id="profilePicturePreview" class="profile-picture-preview" style="display: none;"></div>
                     </div>
                     <div class="form-group">
                         <label>
@@ -314,6 +305,34 @@
                 </div>
                 <button type="submit" class="btn-primary">Create Event</button>
             </form>
+        </div>
+    </div>
+
+    <!-- Leaderboard Modal -->
+    <div id="leaderboardModal" class="modal">
+        <div class="modal-content leaderboard-modal">
+            <span class="close" onclick="closeLeaderboardModal()">&times;</span>
+            <h2>🏆 Tutoring Leaderboard</h2>
+            <div class="leaderboard-top3">
+                <div id="leaderboardTop3" class="top3-container"></div>
+            </div>
+            <div class="leaderboard-actions">
+                <button id="findMyPositionBtn" class="btn-secondary">Find My Position</button>
+                <button id="viewFullLeaderboardBtn" class="btn-primary">View Full Leaderboard</button>
+            </div>
+            <div id="fullLeaderboard" class="full-leaderboard" style="display: none;">
+                <h3>All Tutors</h3>
+                <div id="allTutorsLeaderboard" class="all-tutors-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bio Modal -->
+    <div id="bioModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeBioModal()">&times;</span>
+            <h3 id="bioModalName"></h3>
+            <div id="bioModalContent" class="bio-modal-content"></div>
         </div>
     </div>
 
